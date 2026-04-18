@@ -1,5 +1,100 @@
 \section{V01 Introduction}
 
-\begin{remark}
-    add the lecture contents here :)
-\end{remark}
+\begin{KR}{Agenda}
+    \begin{itemize}
+        \item Build Systems
+        \begin{itemize}
+            \item With/Without Build System
+        \end{itemize}
+        \item The Yocto Project
+        \begin{itemize}
+            \item With/Without Build System 
+            \item Architecture
+            \item Layers
+            \item Recipes
+            \item Adding an Application
+            \item Configuring a System
+            \item Building a bootable Image
+        \end{itemize}
+    \end{itemize}
+\end{KR}
+
+\begin{definition}{What is embedded Linux?}\\
+    Embedded Linux is the usage of the Linux Kernel and various Open-Source Components in embedded systems.
+\end{definition}
+
+\begin{concept}{Advantages for Linux in Embedded}
+\begin{itemize}
+    \item Key advantage of Linux and open-source in embedded systems: Ability to re-use components
+    \begin{itemize}
+        \item Many components for network protocols, multimedia, graphic, cryptographic libraries, etc. exist
+        \item Allows to quickly design and develop complicated products, based on existing components.
+        \item No-one should re-develop yet another operating system kernel, TCP/IP stack, USB stack or another graphical toolkit library.
+    \end{itemize}
+    \item → Focus on the added value of your product.
+    \item Low Cost! Free software can be duplicated on as many devices as you want, free of charge.
+    \begin{itemize}
+        \item → No Software License! (ercept for GPL) $\Rightarrow$ more details in lecture 09 
+        \item Even the development tools are free, unless you choose a commercial embedded Linux edition.
+    \end{itemize}
+    \item Allows to have a higher budget for the hardware or to increase the company's skills and knowledge
+\end{itemize}
+\end{concept}
+
+\begin{theorem}{Benefits of a build system}\\
+\textbf{With a build system}
+\begin{itemize}
+    \item Build systems automate the process of building a target system, including the kernel.
+    \item Automatic download, configure, compile and install all the components in the right order, sometimes after applying.
+    \item They make sure all the application dependencies are matched.
+    \item The build becomes reproducible, which allows to easily change the configuration of some components, upgrade them, fix bugs, etc.
+\end{itemize}
+
+\textbf{Without a build system}
+    \begin{itemize}
+        \item Each application has to be built manually
+        \item The root file system has to be created from scratch.
+        \item The applications configurations have to be done by hand.
+        \item Each dependency has to be matched manually.
+        \item Integrating software from different teams is painful 
+    \end{itemize}
+    \emoji{joy}
+\end{theorem}
+
+\begin{corollary}{Comparison of distribution projects}
+    \begin{itemize}
+        \item Buildroot
+        \begin{itemize}
+            \item Simple to use.
+            \item Adapted for small embedded devices.
+            \item Not perfect if you need advanced functionalities and multiple machines support.
+            \item \href{http://buildroot.org/}{http://buildroot.org/}
+        \end{itemize}
+        \item OpenWRT
+        \begin{itemize}
+            \item Based on Buildroot.
+            \item Primarily used for embedded network devices like routers.
+            \item \href{http://openwrt.org/}{http://openwrt.org/}
+        \end{itemize}
+        \item Poky
+        \begin{itemize}
+            \item Part of the Yocto Project.
+            \item Using OpenEmbedded.
+            \item Suitable for more complex embedded systems.
+            \item Allows lots of customization.
+            \item Can be used for multiple targets at the same time.
+            \item \href{http://yoctoproject.org/}{http://yoctoproject.org/}
+        \end{itemize}
+    \end{itemize}
+\end{corollary}
+
+\subsection{Yocto}
+
+\begin{definition}{What is Yocto?}
+    \begin{itemize}
+        \item The Yocto Project is a set of templates, tools and methods that allow to build custom embedded Linux-based systems.
+        \item It is an open source project initiated by the Linux Foundation in 2010 and is managed by one of its fellows: Richard Purdie.
+    \end{itemize}
+    
+\end{definition}
+
