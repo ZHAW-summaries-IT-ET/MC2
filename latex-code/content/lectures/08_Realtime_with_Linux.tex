@@ -1,0 +1,246 @@
+\section{08 Realtime with Linux}
+
+\subsection{Setting Priorities}
+
+\begin{KR}{Set Priority / Nice in Code}
+    \textbf{RT priority} (only \texttt{SCHED\_FIFO}/\texttt{SCHED\_RR}):
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+param.sched_priority = 10;
+sched_setscheduler(0, SCHED_RR, &param);
+\end{lstlisting}
+    \textbf{Nice level} (only \texttt{SCHED\_OTHER}; no effect on RT threads):
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+setpriority(PRIO_PROCESS, getpid(), 19);
+\end{lstlisting}
+\end{KR}
+
+\begin{KR}{Set Priority from the Command Line}
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+chrt -f 1 <command>        # run command as SCHED_FIFO prio 1
+chrt -p -f 99 <pid>        # change running pid to FIFO prio 99
+#  -o other  -f fifo  -r rr
+nice -n 5 <command>        # start with niceness +5
+renice -n -20 <pid>        # change niceness of a running process
+\end{lstlisting}
+    Niceness: $-20$ (most favourable) \dots $+19$ (least).
+\end{KR}
+
+\subsection{Real-Time A/V Example}
+
+\begin{example2}{Exam Example: A/V Scheduling Strategies (slides 10--15)}
+    3 threads (Audio, Video, Control) together need \important{$>$100\%} CPU. What
+    happens under each policy?
+    \tcblower
+    \begin{itemize}
+        \item \important{All \texttt{SCHED\_OTHER}}: nobody finishes in time; nice
+              levels \emph{unpredictable}. Audio loses samples (\important{highly
+              perceptible}), video drops 6/30, control delayed
+        \item \important{All \texttt{SCHED\_FIFO}} (Audio P99 $>$ Video P98 $>$
+              Control P70): audio + video fine, but Control \important{never runs}
+              (starvation)
+        \item \important{Mixed} (Audio P99 RT; Video nice $-5$, Control nice $+5$,
+              both OTHER): \important{graceful degradation} -- audio perfect, video
+              drops 2/30 (~ok), control delayed 100 ms but acceptable
+    \end{itemize}
+\end{example2}
+
+\subsection{Interrupt Latency}
+
+%% >>> IMAGE (slide 18): direct IRQ handler (all in interrupt context, blocks all tasks) vs threaded IRQ handler (ISR wakes Task B, scheduled FIFO/RR) <<<
+
+\begin{concept}{Interrupt Latency}
+    Time from the external \important{interrupt} until the real-time handler
+    \important{reacts}. Goal: keep it short \& \important{predictable}.
+\end{concept}
+
+\begin{definition}{Direct vs. Threaded IRQ Handler}
+    \begin{itemize}
+        \item \important{Direct}: ISR + handler run in \important{interrupt context}
+              $\to$ blocks \emph{all} other tasks $\to$ keep as short as possible
+        \item \important{Threaded} (modern): split in two
+        \begin{itemize}
+            \item \important{Top-half} (\texttt{irq\_handler}): disable HW interrupt,
+                  return \texttt{IRQ\_WAKE\_THREAD}
+            \item \important{Bottom-half} (\texttt{thread\_handler}, a FIFO/RR thread):
+                  retrieve data, re-enable HW interrupt, return \texttt{IRQ\_HANDLED}
+        \end{itemize}
+    \end{itemize}
+\end{definition}
+
+\begin{KR}{Register a Threaded IRQ Handler}
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+static irq_handler_t irq_handler(unsigned int irq, void *id) { // ISR
+set_some_flags();
+return IRQ_WAKE_THREAD;          // wake the thread handler
+}
+static irq_handler_t thread_handler(unsigned int irq, void *id) { // Task B
+handle_interrupt();
+return IRQ_HANDLED;
+}
+// in probe():
+irq = irq_of_parse_and_map(pdev->dev.of_node, 0);   // from device tree
+devm_request_threaded_irq(&pdev->dev, irq,
+irq_handler, thread_handler, 0, "irq_sevenseg", NULL);
+\end{lstlisting}
+\end{KR}
+
+\begin{corollary}{Latency During a System Call}
+    Ideal latency = the ISR time. \important{But}: if the interrupt occurs during a
+    system call, by default Linux does \important{not} preempt the kernel -- the
+    syscall finishes first $\to$ latency becomes \important{unpredictable}.
+    Solution: \important{kernel preemption}.
+\end{corollary}
+
+\subsection{Kernel Preemption}
+
+\begin{concept}{Two Approaches to RT in Linux}
+    \begin{itemize}
+        \item \important{Approach 1 -- Fully preemptible kernel}: make the kernel
+              preemptible with defined latencies $\to$ \important{PREEMPT\_RT}
+        \item \important{Approach 2 -- Co-kernel}: a layer \emph{below} Linux handles
+              RT so Linux can't affect it $\to$ RTLinux, RTAI, \important{Xenomai}
+    \end{itemize}
+\end{concept}
+
+\mult{2}
+
+\begin{definition}{PREEMPT\_RT}
+    By Molnar, Gleixner, Rostedt. \important{Merged into mainline 20 Sep 2024} --
+    kernel \important{6.12} is the first with built-in RT.
+    \begin{itemize}
+        \item Goal: \important{predictable, deterministic}, bounded \important{max
+              latency} -- \emph{not} higher throughput (RT usually \emph{lowers} it)
+        \item \texttt{cyclictest}: default max \textasciitilde1247 µs $\to$ RT max \textasciitilde77 µs
+    \end{itemize}
+\end{definition}
+
+\begin{corollary}{PREEMPT\_RT Techniques}
+    \begin{itemize}
+        \item \important{Sleeping spinlocks}: waiters sleep instead of busy-looping
+        \item \important{priority inheritance} for in-kernel locks
+        \item \important{threaded IRQ} forced (unless \texttt{IRQF\_NO\_THREAD})
+        \item preemptible \important{RCU}, \important{high-resolution timers}
+    \end{itemize}
+\end{corollary}
+
+\multend
+
+\begin{definition}{Preemption Models (kernel config)}
+    \begin{itemize}
+        \item \important{No Forced Preemption (Server)}: syscalls never preempted;
+              \emph{max throughput}, fewest context switches
+        \item \important{Voluntary (Desktop)}: preempt only at explicit
+              \important{preemption points}
+        \item \important{Preemptible (Low-Latency / Basic RT)}: most code preemptible
+              (ms-range latency), \emph{except} critical sections (spinlocks)
+        \item \important{Fully Preemptible (Full RT)}: preempt everywhere except
+              preempt-/interrupt-disable \& \texttt{spin\_lock}
+    \end{itemize}
+\end{definition}
+
+\subsection{Mutex vs. Spinlocks}
+
+\begin{definition}{Mutex (may block)}
+    Caller is \important{blocked} until the lock is released; the scheduler manages
+    running/blocked. Context switches \important{add delay} $\to$ avoid for hard RT.
+\end{definition}
+
+\begin{example2}{Exam Exercise: Does this software lock work on 2 CPUs? (slides 32--33)}
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+while (lock == 1) {}   // wait until free
+lock = 1;              // acquire
+do_critical_code();
+lock = 0;              // release
+\end{lstlisting}
+    \tcblower
+    \important{No -- it has a race condition.} "test" and "set" are \emph{two}
+    instructions:
+    \begin{itemize}
+        \item CPU1 reads \texttt{lock==0}, before it writes \texttt{lock=1}, CPU2 also
+              reads \texttt{lock==0}
+        \item \important{both} set \texttt{lock=1} and enter the critical section
+    \end{itemize}
+    Fix: an \important{atomic} test-and-set (a \texttt{spin\_lock}).
+\end{example2}
+
+\begin{definition}{Spinlock -- atomic busy-wait}
+    Atomic test-and-set; on ARM via \important{\texttt{LDREX}/\texttt{STREX}}
+    (load/store exclusive).
+\begin{lstlisting}[language=armasm, style=basesmol, aboveskip=2pt, belowskip=2pt]
+spin_lock:
+try_again: LDREX R2, [lock]   ; load exclusive
+if R2 goto try_again          ; busy if already locked
+STREX R2, 1, [lock]           ; store exclusive
+if not R2 goto try_again      ; retry if store failed
+\end{lstlisting}
+    \important{No blocking, no scheduler, no context switch} $\to$ useful with $>$1
+    CPU, fastest reaction. \important{But} kernel preemption is \emph{disabled} while held.
+\end{definition}
+
+\begin{definition}{Standard vs. Sleeping Spinlock}
+    \begin{center}
+    \begin{tabular}{l|c|c}
+         & \texttt{raw\_spinlock\_t} & \texttt{spinlock\_t} (RT) \\\hline
+        sleep? & no & \important{yes} \\
+        preemption & disabled & \important{enabled} \\
+        impl. & busy-wait & \texttt{rt\_mutex} \\
+        latency / CPU & low / high & higher / lower \\
+    \end{tabular}
+    \end{center}
+    PREEMPT\_RT turns most \texttt{spinlock\_t} into \important{sleeping} spinlocks
+    (\texttt{rt\_mutex} with preemption), keeping only tiny/IRQ sections as raw.
+\end{definition}
+
+\subsection{Co-Kernel \& CPU Affinity}
+
+%% >>> IMAGE (slide 44): co-kernel layering -- RT micro-kernel between hardware and the Linux kernel <<<
+
+\begin{definition}{Co-Kernel (Xenomai)}
+    Inserts an RT micro-kernel \important{between hardware and Linux} so RT tasks run
+    independently of Linux. Generations: RTLinux (dead), RTAI (x86 only),
+    \important{Xenomai}.
+\end{definition}
+
+\begin{KR}{Pin a Thread to a CPU (Affinity)}
+    Reserve a core in a multi-core system:
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+cpu_set_t cpuset;
+int cpu = 2;                         // CPU we want to use
+CPU_ZERO(&cpuset);                   // clear the set
+CPU_SET(cpu, &cpuset);               // add CPU 2
+sched_setaffinity(0, sizeof(cpuset), &cpuset);   // 0 = this thread
+while (1) {}                         // now burns only CPU 2
+\end{lstlisting}
+\end{KR}
+
+\begin{remark}
+    \important{Reserve a CPU for IRQ handling}: e.g. on a dual-core (Cyclone V, 2$\times$
+    ARM A9) pin all normal tasks to CPU0 and let the threaded IRQ handler own CPU1
+    $\to$ minimal, predictable interrupt latency.
+\end{remark}
+
+\subsection{Sample Exam (2019)}
+
+\begin{example2}{Exam: PREEMPT\_RT vs Xenomai (Task 5b)}
+    \begin{itemize}
+        \item \important{PREEMPT\_RT}: make the (single) Linux kernel \important{fully
+              preemptible}
+        \item \important{Xenomai}: a \important{co-kernel} (micro-kernel) that does the
+              scheduling between the real-time tasks and the normal Linux kernel
+    \end{itemize}
+\end{example2}
+
+\subsection{Exam Exercise (Probepr\"ufung 2021)}
+
+\begin{example2}{Exam 2021 A5b: PREEMPT\_RT vs Xenomai}
+    Explain the difference in $\leq$3 sentences.
+    \tcblower
+    \begin{itemize}
+        \item \important{PREEMPT\_RT}: make the (single) Linux kernel \important{fully
+              preemptable}
+        \item \important{Xenomai}: a \important{co-kernel} (micro-kernel) that handles
+              the scheduling between real-time tasks and the normal Linux kernel
+    \end{itemize}
+\end{example2}
+
+\raggedcolumns

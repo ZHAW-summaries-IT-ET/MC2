@@ -1,0 +1,248 @@
+\section{11 OpenCV}
+
+\subsection{Basics \& Image I/O}
+
+\mult{2}
+
+\begin{concept}{OpenCV}
+    Open-source computer-vision library (image processing, machine vision, ML).
+    \begin{itemize}
+        \item Intel 1999 (Bradsky); C++/Python/Java; CUDA/OpenCL GPU
+        \item \important{OpenCV-Python} = the Python API
+        \item images are \important{NumPy ndarrays}: 2-D (grayscale) or 3-D
+              (\important{BGR} colour), \texttt{uint8} 0--255
+    \end{itemize}
+\end{concept}
+
+\begin{definition}{HighGui (no display on target!)}
+    HighGui (\texttt{imshow}, \texttt{namedWindow}, \texttt{createTrackbar},
+    \texttt{waitKey}\dots) needs \important{X-Windows}, which is \important{not} in the
+    MC2 Yocto image $\to$ use \important{\texttt{imwrite()} instead of \texttt{imshow()}}.
+\end{definition}
+
+\multend
+
+\begin{KR}{Read / Write Images \& Pass Arguments}
+\begin{lstlisting}[language=Python, style=basesmol, aboveskip=2pt, belowskip=2pt]
+#!/usr/bin/env python3            # shebang: which interpreter
+import cv2, sys, numpy as np
+path = sys.argv[1]               # 1st command-line argument
+img = cv2.imread(path, cv2.IMREAD_COLOR)   # ndarray, or None on failure
+if img is None: sys.exit("Could not read the image.")
+cv2.imwrite("out.png", img)      # type chosen from extension
+\end{lstlisting}
+    \texttt{imread} flag: \important{1 \texttt{IMREAD\_COLOR}} (default),
+    \important{0 \texttt{IMREAD\_GRAYSCALE}}, \important{-1 \texttt{IMREAD\_UNCHANGED}}
+    (incl. alpha). Run: \texttt{chmod +x f.py ; ./f.py img.jpg}.
+\end{KR}
+
+\begin{KR}{Capture Video}
+\begin{lstlisting}[language=Python, style=basesmol, aboveskip=2pt, belowskip=2pt]
+cap = cv2.VideoCapture(0)        # 0 = camera, or "file.webm"
+if not cap.isOpened(): exit()
+print(cap.get(cv2.CAP_PROP_FRAME_WIDTH))   # also FRAME_HEIGHT, FPS
+while True:
+ref, frame = cap.read()          # ref = success bool
+gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+cv2.imwrite("gray.jpg", gray)
+cap.release()
+\end{lstlisting}
+\end{KR}
+
+\subsection{Core Operations}
+
+\begin{KR}{Access \& Manipulate Pixels}
+\begin{lstlisting}[language=Python, style=basesmol, aboveskip=2pt, belowskip=2pt]
+(h, w, c) = img.shape[:3]        # rows, cols, channels
+img.dtype                        # e.g. uint8
+img.size                         # h*w*c
+px = img[100, 100]               # [B, G, R] at y=100, x=100
+blue = img[100, 100, 0]          # channel 0=B, 1=G, 2=R
+img[100, 100, 2] = 0             # set red to 0
+b, g, r = cv2.split(img)         # or faster: b = img[:,:,0]
+img = cv2.merge((b, g, r))
+img[:, :, 1] = 0                 # zero the green channel
+\end{lstlisting}
+    \important{Note:} indexing is \texttt{img[y, x]} (row, col); NumPy slicing is
+    \important{faster} than \texttt{split}/\texttt{merge}.
+\end{KR}
+
+\mult{2}
+
+\begin{definition}{Drawing Primitives}
+    Each takes the image, geometry, \important{(B,G,R)} colour, then thickness
+    (\important{-1 = fill}):
+    \begin{itemize}
+        \item \texttt{line(img, p0, p1, color, w)}
+        \item \texttt{rectangle(img, c1, c2, color, t)}
+        \item \texttt{circle(img, center, r, color, t)}
+        \item \texttt{ellipse(img, c, (maj,min), angle, start, end, color, t)}
+    \end{itemize}
+\end{definition}
+
+\begin{definition}{Borders \& Timing}
+    \texttt{copyMakeBorder(src, top, bot, left, right, type, value)};
+    type = \texttt{BORDER\_CONSTANT} / \texttt{REPLICATE} / \texttt{REFLECT}.
+    Time a block:
+\begin{lstlisting}[language=Python, style=basesmol, aboveskip=2pt, belowskip=1pt]
+t1 = cv2.getTickCount()
+# ... code ...
+dt = (cv2.getTickCount()-t1)/cv2.getTickFrequency()
+\end{lstlisting}
+\end{definition}
+
+\multend
+
+\begin{KR}{Region of Interest (ROI)}
+    Slice \texttt{[start\_row:end\_row, start\_col:end\_col]} = \texttt{[y0:y1, x0:x1]}:
+\begin{lstlisting}[language=Python, style=basesmol, aboveskip=2pt, belowskip=2pt]
+roi = img[70:100, 150:190]       # cut out (30 x 40 region)
+img[10:40, 10:50] = roi          # paste it elsewhere
+\end{lstlisting}
+\end{KR}
+
+\subsection{Convolution}
+
+%% >>> IMAGE (slide 32 / 35): kernel sliding over the image; border padding (3x3 kernel -> 1 line of padding) <<<
+
+\begin{concept}{Convolution}
+    \important{Element-wise multiply two matrices, then sum.} A small \important{kernel}
+    slides left-to-right / top-to-bottom over the image; each output pixel = sum of
+    (neighbourhood $\times$ kernel). Used for \important{blurring, sharpening, edge
+    detection, Haar detection}.
+\end{concept}
+
+\mult{2}
+
+\begin{formula}{Blur \& Sharpen Kernels}
+    \textbf{Blur} (normalised average):
+    $$K = \tfrac{1}{9}\begin{bmatrix}1&1&1\\1&1&1\\1&1&1\end{bmatrix}$$
+    \textbf{Sharpen}:
+    $$K = \begin{bmatrix}0&-1&0\\-1&5&-1\\0&-1&0\end{bmatrix}$$
+\end{formula}
+
+\begin{definition}{Padding \& Kernel Size}
+    \begin{itemize}
+        \item \important{Odd} kernel sizes preferred (have a center pixel)
+        \item a 3$\times$3 kernel needs \important{1 line of padding}; generally
+              \texttt{pad = (k-1)//2}
+        \item padding methods: \important{replicate} (usual), zero, or wrap-around
+    \end{itemize}
+\end{definition}
+
+\multend
+
+\begin{KR}{Implement a Convolution}
+\begin{lstlisting}[language=Python, style=basesmol, aboveskip=2pt, belowskip=2pt]
+def convolve(image, kernel):
+(iH, iW) = image.shape[:2]
+(kH, kW) = kernel.shape[:2]
+pad = (kW - 1) // 2                       # padding width
+image = cv2.copyMakeBorder(image, pad, pad, pad, pad,
+cv2.BORDER_REPLICATE)
+output = np.zeros((iH, iW), dtype="float32")
+for y in np.arange(pad, iH + pad):        # slide kernel
+for x in np.arange(pad, iW + pad):
+roi = image[y-pad:y+pad+1, x-pad:x+pad+1]  # neighbourhood
+k = (roi * kernel).sum()              # multiply + sum
+output[y-pad, x-pad] = k
+return output
+# build a 5x5 blur kernel and apply to a grayscale image:
+kernel = np.ones((5, 5), dtype="float") * (1.0/(5*5))
+gray = cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2GRAY)
+cv2.imwrite("out.jpg", convolve(gray, kernel))
+\end{lstlisting}
+\end{KR}
+
+\begin{KR}{Built-in Filters (faster)}
+\begin{lstlisting}[language=Python, style=basesmol, aboveskip=2pt, belowskip=2pt]
+out = cv2.filter2D(gray, -1, kernel)   # ddepth -1 = same as src
+g = cv2.GaussianBlur(img, (5,5), 0)    # ksize odd; sigma from size
+a = cv2.blur(img, (5,5))               # average blur
+m = cv2.medianBlur(img, 5)             # median blur
+gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)   # also BGR2RGB, BGR2YUV
+\end{lstlisting}
+\end{KR}
+
+\subsection{Object Detection (Haar Cascades)}
+
+%% >>> IMAGE (slide 47): Haar-like features (edge, line, four-rectangle) <<<
+
+\begin{concept}{Haar Cascade Classifiers}
+    Object-detection using a \important{pretrained classifier in an XML file}.
+    \begin{itemize}
+        \item evaluate \important{Haar-like features} (edge/line/4-rectangle) on regions
+        \item \important{AdaBoost} picks the most useful features, combining many
+              \emph{weak} classifiers into one \emph{strong} classifier
+        \item \important{cascade of stages} rejects obvious non-objects \important{early}
+              $\to$ minimise the false-negative rate
+    \end{itemize}
+\end{concept}
+
+\begin{KR}{Detect Faces / Objects}
+\begin{lstlisting}[language=Python, style=basesmol, aboveskip=2pt, belowskip=2pt]
+cascade = cv2.CascadeClassifier("haarcascade_frontalface_default.xml")
+gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)   # must be grayscale
+faces = cascade.detectMultiScale(gray, scaleFactor=1.1,
+minNeighbors=3, minSize=(30,30), maxSize=(100,100),
+flags=cv2.CASCADE_SCALE_IMAGE)
+for (x, y, w, h) in faces:                       # returns rectangles
+cv2.rectangle(image, (x,y), (x+w, y+h), (0,255,0), 2)
+\end{lstlisting}
+\end{KR}
+
+\begin{definition}{detectMultiScale Parameters}
+    \begin{itemize}
+        \item \important{scaleFactor}: how much the image shrinks each pass.
+              Small (e.g. 1.02) $\to$ fine search, accurate but \important{slow};
+              large (1.5) $\to$ fast but misses
+        \item \important{minNeighbors}: overlapping rectangles needed for a hit.
+              Small $\to$ more \important{false positives}; large $\to$ more \important{misses}
+        \item \important{minSize/maxSize}: window size range to detect
+    \end{itemize}
+\end{definition}
+
+\subsection{OCR \& Codes}
+
+\mult{2}
+
+\begin{definition}{pytesseract (OCR)}
+    Tesseract OCR engine: image $\to$ text (segmentation + recognition).
+    \texttt{image\_to\_string(img, config=...)}.
+    \begin{itemize}
+        \item \important{PSM} (page seg): \texttt{6} single uniform block,
+              \texttt{7} single line, \texttt{0} OSD only, \texttt{1} auto+OSD
+        \item \important{OEM} (engine): \texttt{0} legacy, \texttt{1} LSTM neural net,
+              \texttt{2} both, \texttt{3} default
+    \end{itemize}
+\end{definition}
+
+\begin{KR}{Read QR / Barcodes (pyzbar)}
+\begin{lstlisting}[language=Python, style=basesmol, aboveskip=2pt, belowskip=1pt]
+from pyzbar import pyzbar
+barcodes = pyzbar.decode(input)   # 1D + QR
+for bc in barcodes:
+x, y, w, h = bc.rect
+info = bc.data.decode('utf-8')
+cv2.rectangle(input, (x,y), (x+w,y+h), (0,255,0), 2)
+\end{lstlisting}
+\end{KR}
+
+\multend
+
+\begin{examplecode}{License-Plate OCR (slides 59--60)}
+\begin{lstlisting}[language=Python, style=basesmol, aboveskip=2pt, belowskip=2pt]
+import cv2, pytesseract, numpy as np
+gray = cv2.cvtColor(cv2.imread("car.jpg"), cv2.COLOR_BGR2GRAY)
+plate_cascade = cv2.CascadeClassifier("haarcascade_russian_plate_number.xml")
+plates = plate_cascade.detectMultiScale(gray, scaleFactor=1.1,
+minNeighbors=5, minSize=(30,30), flags=cv2.CASCADE_SCALE_IMAGE)
+for (x, y, w, h) in plates:
+roi = gray[y:y+h, x:x+w]
+kernel = np.ones((5,5), np.uint8)
+roi = cv2.erode(roi, kernel, iterations=1)     # clean up
+text = pytesseract.image_to_string(roi, config=r'--oem 3 --psm 6')
+\end{lstlisting}
+\end{examplecode}
+
+\raggedcolumns

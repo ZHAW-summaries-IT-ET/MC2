@@ -1,0 +1,408 @@
+\section{05 Linux Kernel Module}
+
+\subsection{Kernel Modules (LKM)}
+
+%% >>> IMAGE (slide 9): build-up concept -- LKM -> Platform Driver -> + Device Tree -> Access Hardware (GPIO) -> /sys file, driving a 7-segment display <<<
+
+\begin{concept}{Loadable Kernel Module (LKM)}
+    A programming module that bridges user/application and hardware. Added
+    \important{on the fly} while the OS runs (hence "loadable").
+    \begin{itemize}
+        \item Not a user program; minimal HW-access functionality
+        \item Gateway to user space via a \important{virtual file} (\texttt{/sys/\dots})
+        \item Written in \important{C} only (no C++); Rust since Dec 2025
+        \item Only \important{root} can load a module
+    \end{itemize}
+\end{concept}
+
+\begin{example2}{Exam Quiz: Why a kernel driver instead of mmap()? (slide 4)}
+    Why implement a driver as a kernel driver if you could access peripheral
+    addresses directly via \texttt{mmap()} from user space? Select one or more:
+    \begin{enumerate}
+        \item A kernel driver can be started automatically when the kernel loads
+              the device tree
+        \item The GPL license requires using kernel drivers
+        \item For self-identifying hardware (USB, PCIe, HDMI) the driver must be in
+              the kernel
+        \item A kernel driver gives faster access than \texttt{mmap()} from user space
+        \item In user space there are no direct interrupts from peripherals
+    \end{enumerate}
+    \tcblower
+    \important{Correct: (1), (3), (5).}
+    (2) false -- no GPL requirement; (4) false -- \texttt{mmap()} is \emph{not} slower.
+\end{example2}
+
+\mult{2}
+
+\begin{definition}{LKM Commands}
+    \begin{itemize}
+        \item \texttt{insmod <module.ko>} -- insert
+        \item \texttt{rmmod <module>} -- remove
+        \item \texttt{lsmod} -- list loaded modules
+        \item \texttt{modinfo <module.ko>} -- module info
+        \item \texttt{modprobe} -- insert/remove from \texttt{/lib/modules}
+    \end{itemize}
+\end{definition}
+
+\begin{definition}{Module Types \& Minimum}
+    Types: device drivers, filesystem drivers, network drivers. Minimum = an
+    \texttt{\_\_init} and an \texttt{\_\_exit} method:
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+int  __init init_module(void)    { /* init */ }
+void __exit cleanup_module(void) { /* clean shutdown */ }
+\end{lstlisting}
+\end{definition}
+
+\multend
+
+\subsection{Step 1: Simple Kernel Module}
+
+\mult{2}
+
+\begin{definition}{Module Skeleton}
+    \begin{itemize}
+        \item \texttt{static int \_\_init my\_init(void)}
+        \item \texttt{static void \_\_exit my\_exit(void)}
+        \item register: \texttt{module\_init(\dots)}, \texttt{module\_exit(\dots)}
+        \item info macros: \texttt{MODULE\_LICENSE/AUTHOR/DESCRIPTION/VERSION}
+    \end{itemize}
+\end{definition}
+
+\begin{definition}{Debugging: pr\_* (no printf!)}
+    There is \important{no} \texttt{printf}/\texttt{stdio.h} in the kernel.
+    \texttt{printk} is deprecated; use:
+    \begin{itemize}
+        \item \texttt{pr\_info}, \texttt{pr\_err}, \texttt{pr\_alert}, \texttt{pr\_emerg}
+        \item \texttt{dev\_info(dev, \dots)}, \texttt{dev\_err(dev, \dots)}
+    \end{itemize}
+\end{definition}
+
+\multend
+
+\begin{examplecode}{Minimal Kernel Module (slide 13)}
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+#include <linux/kernel.h>
+#include <linux/module.h>
+static int __init sevenseg_init(void) {
+pr_info("Hello from sevenseg driver!\n");
+return 0;
+}
+static void __exit sevenseg_exit(void) {
+pr_info("Bye from sevenseg driver!\n");
+}
+module_init(sevenseg_init);   // mandatory: identify init
+module_exit(sevenseg_exit);   // and cleanup function
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Armin Weiss");
+MODULE_DESCRIPTION("7 segment display driver");
+MODULE_VERSION("1.0");
+\end{lstlisting}
+\end{examplecode}
+
+\mult{2}
+
+\begin{corollary}{Tainted Kernel}
+    If \texttt{MODULE\_LICENSE} is not a GPL-compatible tag, loading the module
+    \important{taints} the kernel.
+    \begin{itemize}
+        \item \texttt{G}: all modules GPL(-compatible)
+        \item \texttt{P}: a proprietary module/kernel is loaded
+        \item bit 0 = proprietary, bit 10 = staging, bit 12 = out-of-tree module
+        \item check: \texttt{cat /proc/sys/kernel/tainted}
+    \end{itemize}
+\end{corollary}
+
+\begin{corollary}{Namespace Pollution}
+    Without symbol-visibility control, global names in different modules collide
+    with the kernel and each other.
+    \important{Always use \texttt{static} for global variables and functions!}
+\end{corollary}
+
+\multend
+
+\subsection{Step 2: Platform Driver}
+
+\begin{concept}{Discoverable vs. Non-Discoverable HW}
+    \begin{itemize}
+        \item \important{Discoverable} (PCI, USB): device announces its identity on
+              the bus
+        \item \important{Non-discoverable} (I2C, SPI): must be declared explicitly in
+              the \important{device tree}
+        \item A kernel module talking to the device tree = \important{platform driver}
+    \end{itemize}
+\end{concept}
+
+\begin{definition}{Platform Driver Responsibilities}
+    Defines a state struct + a \texttt{probe()} and \texttt{remove()} method.
+    \begin{itemize}
+        \item \texttt{probe(struct platform\_device *pdev)}: init state, request
+              device-tree info, map I/O memory, register IRQs/threads, register to a
+              kernel framework
+        \item \texttt{remove()}: undo the above
+        \item register in \texttt{init()}, unregister in \texttt{exit()}
+    \end{itemize}
+\end{definition}
+
+\begin{examplecode}{Platform Driver Definition \& Registration (slides 24--25)}
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+static int sevenseg_probe(struct platform_device *pdev) {
+pr_info("Hello from sevenseg_probe()\n"); return 0;
+}
+static int sevenseg_remove(struct platform_device *pdev) {
+pr_info("Bye from sevenseg_remove()\n"); return 0;
+}
+static struct platform_driver sevenseg_driver = {
+.driver = { .name = "sevenseg", .owner = THIS_MODULE },
+.probe = sevenseg_probe,
+.remove = sevenseg_remove,
+};
+static int __init sevenseg_init(void) {
+return platform_driver_register(&sevenseg_driver);
+}
+static void __exit sevenseg_exit(void) {
+platform_driver_unregister(&sevenseg_driver);
+}
+\end{lstlisting}
+\end{examplecode}
+
+\subsection{Step 3: Add the Device Tree}
+
+\begin{definition}{Matching a Device-Tree Node}
+    Provide a \texttt{compatible} list, export it with \texttt{MODULE\_DEVICE\_TABLE},
+    and reference it via \texttt{.of\_match\_table}. The driver then binds to the DT
+    node with the same \texttt{compatible} string.
+\end{definition}
+
+\begin{examplecode}{Device-Tree Match (slide 27)}
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+static const struct of_device_id sevenseg_ids[] = {
+{ .compatible = "sevenseg" },
+{ }
+};
+MODULE_DEVICE_TABLE(of, sevenseg_ids);
+static struct platform_driver sevenseg_driver = {
+.driver = { .name = "sevenseg", .owner = THIS_MODULE,
+.of_match_table = sevenseg_ids },
+.probe = sevenseg_probe, .remove = sevenseg_remove,
+};
+// device tree:  sevenseg { compatible = "sevenseg"; ... };
+\end{lstlisting}
+\end{examplecode}
+
+\subsection{Step 4: Access the Hardware}
+
+\begin{definition}{Global Data Struct}
+    A struct shared between all methods, allocated with \texttt{devm\_kzalloc}
+    (auto-freed) and stored via \texttt{platform\_set\_drvdata}.
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+typedef struct sevenseg_platform_data {
+struct device *dev;
+void __iomem *base_addr;
+int counter, mode, irq;
+struct task_struct *kthread_sevenseg;
+} sevenseg_platform_data;
+// in probe():
+pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+platform_set_drvdata(pdev, pdata);
+\end{lstlisting}
+\end{definition}
+
+\begin{KR}{Access Peripheral Registers from the Driver}
+    \textbf{Step 1 -- get the (virtual) base address} from the device tree:
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+res = platform_get_resource(pdev, IORESOURCE_MEM, 0);  // 35-bit phys
+base_addr = devm_ioremap_resource(&pdev->dev, res);    // -> virtual
+\end{lstlisting}
+    \textbf{Step 2 -- read/write} (8/16/32-bit) at \texttt{base\_addr + offset}:
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+void iowrite32(u32 value, void *addr);   // write
+unsigned int ioread32(void *addr);       // read
+\end{lstlisting}
+    The DT node carries \texttt{reg = <addr size>} and \texttt{interrupts = <\dots>}.
+\end{KR}
+
+\subsection{Step 5: Create a /sys File}
+
+\begin{KR}{Expose a sysfs Attribute}
+    \textbf{Step 1 -- show/store callbacks} (read/write of the file):
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+static ssize_t counter_show(struct device *dev,
+struct device_attribute *attr, char *buf) {
+return scnprintf(buf, PAGE_SIZE, "value\n");   // user cat
+}
+static ssize_t counter_store(struct device *dev,
+struct device_attribute *attr, const char *buf, size_t count) {
+pr_info("New Message %s\n", buf);              // user echo
+return count;
+}
+DEVICE_ATTR(counter, 0644, counter_show, counter_store);
+\end{lstlisting}
+    \textbf{Step 2 -- create/remove the file} in probe/remove:
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+device_create_file(&pdev->dev, &dev_attr_counter);   // in probe
+device_remove_file(&pdev->dev, &dev_attr_counter);   // in remove
+\end{lstlisting}
+    \paragraph{conclusion}
+    File appears at\\
+    \texttt{/sys/bus/platform/drivers/<mod>/<PHYS\_ADDR>.<mod>/counter}\\
+    e.g. \texttt{.../sevenseg/fe200000.sevenseg/counter} ($\to$ \texttt{echo}/\texttt{cat}).
+\end{KR}
+
+\subsection{Interrupts}
+
+%% >>> IMAGE (slide 44): BCM2711 interrupt routing -- 62 peripheral IRQs through VideoCore + ARM GIC to the 4 ARM cores <<<
+
+\begin{concept}{Interrupt Controller vs. Handler}
+    \begin{itemize}
+        \item \important{Interrupt controller}: hardware that "executes"/routes the
+              interrupt (ARM \important{GIC})
+        \item \important{Interrupt handler}: where the ISR is implemented (reacts)
+    \end{itemize}
+\end{concept}
+
+\begin{definition}{Device-Tree Interrupt Definition}
+    \texttt{interrupts = <type number flags>}:
+    \begin{itemize}
+        \item type: \texttt{0} = SPI (shared), \texttt{1} = PPI (private)
+        \item flags: \texttt{1} rising edge, \texttt{2} falling edge,
+              \texttt{4} active-high level, \texttt{8} active-low level
+        \item controller node: \texttt{compatible = "arm,gic-400"}, referenced via
+              \texttt{interrupt-parent}
+    \end{itemize}
+\end{definition}
+
+\begin{KR}{Calculate the GIC SPI Number (slide 47)}
+    For GPIO Bank 0 ($\to$ \texttt{interrupts = <0x00 0x71 0x04>}):
+    \begin{enumerate}
+        \item \important{VideoCore IRQ}: GPIO Bank 0 (GPIOs 0--27) = IRQ \important{49}
+        \item \important{Hardware IRQ}: add ARM offset 96 $\to$ $49 + 96 = 145$
+        \item \important{GIC SPI number}: GIC reserves the first 32 (SGI/PPI), so
+              subtract 32 $\to$ $145 - 32 = \important{113} = $ \texttt{0x71}
+    \end{enumerate}
+    So type \texttt{0x00} (SPI), number \texttt{0x71}, flags \texttt{0x04} (active-high level).
+\end{KR}
+
+\begin{examplecode}{Register an Interrupt Handler (slide 48)}
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+static irq_handler_t irq_handler(unsigned int irq, void *dev_id) {
+do_something();
+iowrite32(0x1 << keys[1],
+pdata->base_addr + GPEDSX_OFFSET(keys[1]));  // clear IRQ
+return (irq_handler_t) IRQ_HANDLED;
+}
+// in probe():
+pdata->irq = irq_of_parse_and_map(pdata->dev->of_node, 0);
+devm_request_irq(pdata->dev, pdata->irq, irq_handler,
+IRQF_TRIGGER_NONE, "irq_sevenseg", pdata);
+\end{lstlisting}
+\end{examplecode}
+
+\subsection{Kernel Threads}
+
+\begin{definition}{kthread API}
+    \begin{itemize}
+        \item \texttt{kthread\_run(fn, data, namefmt)} -- create + run, returns
+              \texttt{task\_struct} (name visible in \texttt{ps})
+        \item \texttt{kthread\_should\_stop()} -- check inside the loop
+        \item \texttt{kthread\_stop(task)} -- request stop
+    \end{itemize}
+\end{definition}
+
+\begin{examplecode}{Kernel Thread (slide 52)}
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+static int thread_fn(void *data) {
+while (!kthread_should_stop()) {
+do_something();
+msleep(2000);
+}
+return 0;
+}
+// probe():  pdata->kthread = kthread_run(thread_fn, pdata, "kthread_7seg");
+// remove(): kthread_stop(pdata->kthread);
+\end{lstlisting}
+\end{examplecode}
+
+\subsection{Putting It Together (Lab 5--6)}
+
+\begin{remark}
+    \important{7-Segment Counter} combines all three feature types:
+    \begin{itemize}
+        \item \important{User requests} (write 2-digit numbers) $\to$ sysfs
+              (\texttt{counter\_show}/\texttt{counter\_store})
+        \item \important{Hardware requests} (start/stop down-counting) $\to$ interrupt
+              handler (\texttt{irq\_handler})
+        \item \important{Iterative tasks} (periodic down-count) $\to$ kernel thread
+              (\texttt{thread\_fn})
+    \end{itemize}
+    All glued by \texttt{sevenseg\_probe}/\texttt{remove} + the
+    \texttt{sevenseg\_platform\_data} struct.
+\end{remark}
+
+\begin{remark2}{Memory-Mapped I/O -- Zero-Copy (optional)}
+    \texttt{mmap} maps the \important{same physical memory} into both kernel and user
+    address spaces $\to$ \important{no copy}, no \texttt{read()}/\texttt{write()}
+    syscalls for data transfer.
+    \begin{itemize}
+        \item driver: \texttt{remap\_pfn\_range()} maps physical pages into the
+              user VM; set \texttt{VM\_IO} (excludes from core dumps)
+        \item user: \texttt{mmap(\dots, MAP\_SHARED, fd, 0)} $\to$ changes visible to driver
+    \end{itemize}
+\end{remark2}
+
+\subsection{Sample Exam (2019)}
+
+\begin{example2}{Exam: Complete the Platform Driver (Task 2)}
+    Fill the gaps so a \texttt{'1'} is written to the first GPIO address (from the
+    device tree). Key fills:
+    \tcblower
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+static int my_module_probe(struct platform_device *pdev) {
+int res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+void __iomem *base_addr = devm_ioremap_resource(&pdev->dev, res);
+iowrite32(1, base_addr);                 // write '1'
+return 0;
+}
+static const struct of_device_id my_module_device_tree_ids[] = {
+{ .compatible = "brcm,bcm2711-gpio" }, { }
+};
+MODULE_DEVICE_TABLE(of, my_module_device_tree_ids);
+static struct platform_driver my_module_driver = {
+.driver = { .name = "my_module", .owner = THIS_MODULE,
+.of_match_table = my_module_device_tree_ids },
+.probe = my_module_probe, .remove = my_module_remove,
+};
+static int __init my_module_init(void) {
+return platform_driver_register(&my_module_driver); }
+static void __exit my_module_exit(void) {
+platform_driver_unregister(&my_module_driver); }
+module_init(my_module_init);  module_exit(my_module_exit);
+MODULE_LICENSE("GPL");
+\end{lstlisting}
+\end{example2}
+
+\subsection{Exam Exercise (Probepr\"ufung 2021)}
+
+\begin{example2}{Exam 2021 A2: Complete the platform driver}
+    Fill in the module so it writes \texttt{1} to the first GPIO address from the
+    device tree. Key fill-ins:
+    \tcblower
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+// in probe():
+struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+void __iomem *base_addr = devm_ioremap_resource(&pdev->dev, res);
+iowrite32(1, base_addr);
+// match table:
+{ .compatible = "brcm,bcm2711-gpio", },
+MODULE_DEVICE_TABLE(of, my_module_device_tree_ids);
+// driver struct:
+.of_match_table = my_module_device_tree_ids,
+.probe = my_module_probe, .remove = my_module_remove,
+// init / exit:
+return platform_driver_register(&my_module_driver);
+platform_driver_unregister(&my_module_driver);
+module_init(my_module_init); module_exit(my_module_exit);
+MODULE_LICENSE("GPL");
+\end{lstlisting}
+\end{example2}
+
+\raggedcolumns

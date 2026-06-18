@@ -1,0 +1,224 @@
+\section{10 GStreamer}
+
+\subsection{Framework Overview}
+
+%% >>> IMAGE (slide 24): pipeline/bin -- source element (filesrc) -> filter element (decoder) -> sink element (ALSA), connected via src/sink pads <<<
+
+\begin{concept}{GStreamer}
+    A free, platform-independent \important{multimedia framework} (play, en-/decode,
+    edit audio \& video). Works on the \important{pipeline principle}: small modules
+    chained into processing graphs. LGPL-2.1, 250+ plugins.
+    \begin{itemize}
+        \item \important{Element} (= plugin): one processing block
+        \item \important{Pad}: an element's in/out connector (\texttt{src}/\texttt{sink})
+        \item \important{Pipeline} (top-level \important{bin}): the whole chain;
+              \important{Source} $\to$ \important{Filter} $\to$ \important{Sink}
+    \end{itemize}
+\end{concept}
+
+\mult{2}
+
+\begin{definition}{Kernel Audio/Video Interfaces}
+    \begin{itemize}
+        \item \important{ALSA} (Advanced Linux Sound Architecture): the free sound
+              layer in the kernel (by Kysela; replaced OSS in 2.6)
+        \item \important{V4L} (Video4Linux): kernel drivers + API for real-time
+              audio/video
+    \end{itemize}
+\end{definition}
+
+\begin{definition}{Two Ways to Use GStreamer}
+    \begin{itemize}
+        \item \texttt{gst-launch-1.0}: build/run pipelines from the
+              \important{command line} -- prototyping/debugging
+        \item \important{GStreamer API}: build pipelines in \important{C}
+              (\texttt{gst\_*} calls)
+    \end{itemize}
+\end{definition}
+
+\multend
+
+\subsection{ALSA (Audio)}
+
+\begin{KR}{Discover \& Configure Audio Devices}
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+aplay -l                              # list PLAYBACK devices (card/device #)
+arecord -l                            # list CAPTURE devices
+arecord --device=hw:1,0 --dump-hw-params  # show params of card1,dev0
+alsamixer                             # interactive mixer (F3 play, F4 cap, F6 card)
+amixer -c 1 scontrols                 # list simple controls of card 1
+amixer -c 1 sget 'Master'             # read a control
+amixer -c 1 sset 'Master' 80%         # set a control
+\end{lstlisting}
+    Device string \important{\texttt{hw:x,y}} (x = sound-card \#, y = device \#);
+    \texttt{S16\_LE} = signed 16-bit little-endian.
+\end{KR}
+
+\subsection{V4L (Video)}
+
+\begin{KR}{Discover Video Devices \& Formats}
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+v4l2-ctl --list-devices               # e.g. /dev/video0 (USB webcam)
+v4l2-ctl -d /dev/video0 --list-formats-ext   # formats (YUYV, MJPG), sizes, fps
+\end{lstlisting}
+\end{KR}
+
+\subsection{gst-launch-1.0 Prototyping}
+
+\begin{KR}{Build a Pipeline}
+    \texttt{gst-launch-1.0 [OPTIONS] PIPELINE-DESCRIPTION}
+    \begin{itemize}
+        \item chain elements with \important{\texttt{!}}
+        \item set a property with \important{\texttt{property=value}} (applies to the
+              \emph{previous} element)
+        \item inspect: \texttt{gst-inspect-1.0} (all elements),
+              \texttt{gst-inspect-1.0 <element>} (its properties)
+    \end{itemize}
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+gst-launch-1.0 audiotestsrc ! audioconvert ! autoaudiosink
+gst-launch-1.0 videotestsrc pattern=11 ! videoconvert ! autovideosink
+\end{lstlisting}
+\end{KR}
+
+\begin{definition}{Plugin Categories}
+    \begin{itemize}
+        \item \important{Base}: small fixed core set, always maintained
+        \item \important{Good}: good code + correct function, \important{LGPL}
+        \item \important{Ugly}: good quality \emph{but} license/patent redistribution issues
+        \item \important{Bad}: not yet up to par (missing review/docs/tests/maintainer)
+    \end{itemize}
+\end{definition}
+
+\begin{definition}{Key Elements}
+    \begin{itemize}
+        \item \texttt{audiotestsrc} -- test tone: \texttt{wave} (0 sine, 1 square,
+              2 saw, 3 triangle, 4 silence, 5 white-noise), \texttt{freq} (def 440,
+              \important{max = rate/4}), \texttt{volume} (def 0.8, 0--1)
+        \item \texttt{videotestsrc} -- test pattern
+        \item \texttt{autoaudiosrc}/\texttt{autoaudiosink} -- auto-pick device
+        \item \texttt{alsasink} -- ALSA output: \texttt{device=hw:x,y}, \texttt{sync}
+        \item \texttt{filesrc location=...} -- read a file
+        \item \texttt{audioconvert} -- format/channel conversion
+        \item \texttt{audioresample} -- change sample rate
+        \item \texttt{videoconvert} -- colour-space conversion (RGB$\leftrightarrow$YUV)
+        \item \texttt{videorate} -- match a target framerate
+        \item \texttt{v4l2src device=/dev/video0} -- capture from a camera
+        \item \texttt{jpegenc} -- encode JPEG
+    \end{itemize}
+\end{definition}
+
+\begin{definition}{Caps (Capabilities)}
+    A media-format filter inserted between elements: \texttt{media-type, format, rate,
+    channels, width, height}. Written as a "pseudo-element":
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+gst-launch-1.0 audiotestsrc ! audioconvert ! \
+  audio/x-raw,format=S8,channels=2 ! autoaudiosink
+\end{lstlisting}
+\end{definition}
+
+\begin{examplecode}{Video Processing Pipeline (slide 41)}
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+gst-launch-1.0 v4l2src device=/dev/video0 \
+  ! video/x-raw,framerate=30/1,width=640,height=480 \  # input format
+  ! videorate ! video/x-raw,framerate=50/1 \           # -> 50 fps
+  ! videoconvert ! video/x-raw,format=YUY2 \            # -> YUY2 colour
+  ! jpegenc ! multifilesink location="color_img.jpg"    # color_img0000.jpg...
+\end{lstlisting}
+\end{examplecode}
+
+\begin{remark}
+    \important{Useful plugins:} \texttt{lame} (MP3 enc), \texttt{mpeg123} (MP3 dec),
+    \texttt{videomixer}, \texttt{videocrop}, \texttt{wavenc}/\texttt{wavparse},
+    \texttt{videofilter} (bright/hue/flip/rotate), \texttt{audioecho},
+    \texttt{spectrum} (analyser), \texttt{equalizer-10bands},
+    \texttt{rtpsink}/\texttt{udpsink} (stream over network).
+\end{remark}
+
+\subsection{GStreamer C API}
+
+%% >>> IMAGE (slide 59): GStreamer state machine NULL -> READY -> PAUSED (prerolling/prerolled) -> PLAYING <<<
+
+\begin{KR}{The 8-Step API Workflow}
+    \begin{enumerate}
+        \item \texttt{gst\_init(\&argc, \&argv)} -- always first
+        \item \texttt{gst\_pipeline\_new("name")} -- create the bin
+        \item \texttt{gst\_element\_factory\_make("type","name")} + \texttt{g\_object\_set}
+              (properties) -- create \& configure elements
+        \item \texttt{gst\_bin\_add\_many(GST\_BIN(bin), e1, e2, NULL)} -- add to pipeline
+        \item \texttt{gst\_element\_link(a,b)} (or \texttt{\_link\_filtered} with caps) -- link
+        \item \texttt{gst\_element\_set\_state(bin, GST\_STATE\_PLAYING)} -- play
+        \item \texttt{g\_main\_loop\_new} + \texttt{g\_main\_loop\_run} -- run
+        \item cleanup: \texttt{g\_main\_loop\_unref}, set state \texttt{GST\_STATE\_NULL},
+              \texttt{gst\_object\_unref(bin)}
+    \end{enumerate}
+\end{KR}
+
+\begin{examplecode}{Pipeline in C (steps 1--8)}
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+gst_init(&argc, &argv);                                      // 1
+GstElement *bin = gst_pipeline_new("test-pipeline");         // 2
+GstElement *src  = gst_element_factory_make("audiotestsrc","source_1");
+GstElement *sink = gst_element_factory_make("alsasink","sink_1");
+g_object_set(G_OBJECT(src), "wave", 0, "freq", 1000.0, NULL);// 3 props
+g_object_set(G_OBJECT(sink), "device", "hw:1,0", NULL);
+gst_bin_add_many(GST_BIN(bin), src, sink, NULL);             // 4
+if (!gst_element_link(src, sink)) {                          // 5
+g_printerr("Elements could not be linked.\n");
+gst_object_unref(bin); return -1;
+}
+gst_element_set_state(bin, GST_STATE_PLAYING);               // 6
+GMainLoop *loop = g_main_loop_new(NULL, FALSE);              // 7
+g_main_loop_run(loop);
+g_main_loop_unref(loop);                                     // 8
+gst_element_set_state(bin, GST_STATE_NULL);
+gst_object_unref(bin);
+\end{lstlisting}
+\end{examplecode}
+
+\mult{2}
+
+\begin{definition}{State Machine}
+    \texttt{NULL} (no resources) $\to$ \texttt{READY} $\to$ \texttt{PAUSED}
+    (prerolling $\to$ prerolled) $\to$ \texttt{PLAYING}. Stop = back to \texttt{NULL}.
+\end{definition}
+
+\begin{KR}{Caps Filter in C}
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+caps = gst_caps_new_simple("audio/x-raw",
+"rate", G_TYPE_INT, 44100,
+"channels", G_TYPE_INT, 2, NULL);
+gst_element_link_filtered(conv, spect, caps);
+gst_caps_unref(caps);
+\end{lstlisting}
+\end{KR}
+
+\multend
+
+\begin{KR}{Shortcut: gst\_parse\_launch}
+    Replaces steps 2--5 with a single \texttt{gst-launch}-style string:
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+bin = gst_parse_launch("audiotestsrc ! audioconvert ! autoaudiosink", NULL);
+gst_element_set_state(bin, GST_STATE_PLAYING);
+// ... main loop + cleanup as before
+\end{lstlisting}
+\end{KR}
+
+\begin{KR}{Message Handling (Bus Watch)}
+    Register a callback that receives every message on the pipeline's bus:
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+bus = gst_element_get_bus(bin);
+gst_bus_add_watch(bus, message_handler, &data);   // register callback
+gst_object_unref(bus);
+// callback:
+gboolean message_handler(GstBus *bus, GstMessage *msg, gpointer data) {
+g_print("From: %s, Type: %s\n",
+GST_OBJECT_NAME(GST_MESSAGE_SRC(msg)),
+GST_MESSAGE_TYPE_NAME(msg));
+return TRUE;
+}
+\end{lstlisting}
+    Used e.g. with the \texttt{spectrum} element (\texttt{bands}, \texttt{threshold},
+    \texttt{post-messages}, \texttt{interval}) to read magnitude values per band.
+\end{KR}
+
+\raggedcolumns

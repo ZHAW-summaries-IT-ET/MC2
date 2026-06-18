@@ -1,0 +1,341 @@
+\section{04 Linux Kernel}
+
+\subsection{Kernel Characteristics \& History}
+
+\begin{concept}{Linux Kernel -- Characteristics}
+    \begin{itemize}
+        \item An \important{executable binary}
+        \item Drivers \important{can be part} of the kernel
+        \item Must be \important{recompiled} if a driver is added as built-in (\texttt{*})
+        \item Linux is \important{both modular and monolithic}
+    \end{itemize}
+\end{concept}
+
+\begin{example2}{Exam Quiz: What is true about the Linux kernel? (slide 2)}
+    Select one or more:
+    \begin{enumerate}
+        \item System calls are the only way to communicate with the kernel
+        \item Kernel modules run slower than built-in drivers
+        \item The kernel must be recompiled when a driver is added with \texttt{"*"}
+        \item Drivers can be part of the kernel
+        \item It is an executable binary
+    \end{enumerate}
+    \tcblower
+    \important{Correct: (3), (4), (5).}
+    \begin{itemize}
+        \item (1) false -- sysfs/\texttt{/proc} also communicate with the kernel
+        \item (2) false -- modules run at the \emph{same} speed as built-in drivers
+    \end{itemize}
+\end{example2}
+
+\begin{definition}{Birth of Linux}
+    \begin{itemize}
+        \item \important{Stallman / GNU}: tools (\texttt{gcc}, \texttt{bash}), libs (\texttt{glibc})
+              -- but \emph{no kernel} (Hurd never finished)
+        \item \important{Torvalds (1991)}: wrote a simple \important{monolithic} kernel
+              "Linux", founded \texttt{kernel.org}
+        \item Linux = GNU tools/libs \important{+} Torvalds' kernel
+    \end{itemize}
+\end{definition}
+
+\begin{example2}{Exam Quiz: Components of the Linux project? (slide 4)}
+    (vs the GNU project) -- mark the Linux-project components:
+    \begin{enumerate}
+        \item Free Software Foundation
+        \item Monolithic Kernel
+        \item Loadable Kernel Module
+        \item gcc
+        \item www.kernel.org
+    \end{enumerate}
+    \tcblower
+    \important{Correct: (2), (3), (5).}
+    FSF and \texttt{gcc} belong to \important{GNU} (Stallman), not the Linux project.
+\end{example2}
+
+\subsection{Kernel Architecture}
+
+%% >>> IMAGE (slide 8): kernel architecture -- apps / system libs (libc) / syscall + sysfs interface / kernel (scheduler, MM, IPC, FS, networking, drivers, modules) / arch-dependent code / hardware <<<
+
+\mult{2}
+
+\begin{concept}{Monolithic vs. Microkernel}
+    \begin{itemize}
+        \item \important{Monolithic} (Linux): everything in kernel space; easier to
+              program \& debug
+        \item \important{Microkernel} (GNU Hurd): only the essentials in the kernel;
+              drivers/FS as user-space servers
+    \end{itemize}
+\end{concept}
+
+\begin{corollary}{Microkernel Core Components}
+    A microkernel keeps only:
+    \begin{itemize}
+        \item \important{Scheduler}
+        \item \important{Interprocess Communication (IPC)}
+        \item \important{Virtual Memory controller}
+    \end{itemize}
+    (File system \& device drivers live in user space.)
+\end{corollary}
+
+\multend
+
+\begin{example2}{Exam Quiz: Microkernel (Hurd) components? (slide 6)}
+    Select one or more: Scheduler $\cdot$ File System $\cdot$ IPC $\cdot$
+    Device Drivers $\cdot$ Virtual Memory Controller
+    \tcblower
+    \important{Correct: Scheduler, IPC, Virtual Memory Controller.}
+    File System \& Device Drivers are \emph{user-space servers} in a microkernel.
+\end{example2}
+
+\begin{definition}{Monolithic vs. Modular Kernel}
+    \begin{itemize}
+        \item \important{Monolithic}: single executable, all drivers built in; adding
+              a driver $\to$ \important{recompile} the whole kernel
+        \item \important{Modular}: monolithic + a \important{module interface}; add a
+              driver as a module \important{at run-time}, no recompile
+        \item Linux is \important{both} (modular monolithic kernel)
+    \end{itemize}
+\end{definition}
+
+\begin{remark}
+    \important{Recent:} PREEMPT\_RT (real-time) merged into mainline since Linux
+    \important{6.12} (Nov 2024); \important{Rust} declared no longer experimental
+    (2025), now a core part of the kernel.
+\end{remark}
+
+\subsection{Getting \& Building the Kernel}
+
+\mult{2}
+
+\begin{definition}{Getting the Sources}
+    From \texttt{kernel.org} via \important{HTTP / GIT / RSYNC}; the "vanilla" kernel.
+    Release types:
+    \begin{itemize}
+        \item \important{mainline} (rc), \important{stable}, \important{longterm}
+        \item tarballs (full source) + patches (diffs between versions)
+    \end{itemize}
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+git clone git://git.kernel.org/.../torvalds/linux.git
+\end{lstlisting}
+\end{definition}
+
+\begin{definition}{Source Tree -- Key Directories}
+    \begin{itemize}
+        \item \texttt{init/} -- arch-independent boot code (\texttt{main.c} $\to$
+              \texttt{start\_kernel()})
+        \item \texttt{ipc/} -- System V IPC (\texttt{sem}/\texttt{msg}/\texttt{shm})
+        \item \texttt{kernel/} -- core: \texttt{sched}, fork/exec/signal, modules
+        \item \texttt{arch/} -- per-CPU ports (x86, arm, arm64, riscv\dots)
+        \item \texttt{drivers/} -- \important{largest} part of the tree (\textasciitilde61\%)
+        \item \texttt{fs/} -- filesystems; \texttt{include/} -- headers (\texttt{asm-*}, \texttt{linux})
+    \end{itemize}
+\end{definition}
+
+\multend
+
+\mult{2}
+
+\begin{definition}{Kernel Configuration}
+    Config stored in \texttt{.config} (text, \texttt{key=value}); never edit by hand:
+    \begin{itemize}
+        \item \texttt{make menuconfig} (text, needs \texttt{libncurses-dev})
+        \item \texttt{make xconfig} (graphical)
+        \item undo: \texttt{cp .config.old .config}
+        \item Yocto: \texttt{bitbake -c menuconfig virtual/kernel}
+    \end{itemize}
+\end{definition}
+
+\begin{definition}{Built-in vs. Module}
+    \begin{itemize}
+        \item \texttt{*} (\important{built-in}): compiled into the image, always
+              available at boot, loaded by the bootloader
+        \item \texttt{M} (\important{module}): loaded/unloaded \important{dynamically},
+              stored in the filesystem (needs FS access); easy driver dev: load,
+              test, unload, rebuild\dots
+    \end{itemize}
+\end{definition}
+
+\multend
+
+\begin{KR}{Build \& Install the Kernel}
+    \textbf{Host:}
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+make                       # build -> arch/<arch>/boot/{zImage,bzImage,Image}
+make install               # as root: installs /boot/vmlinuz-<ver>,
+                           # System.map-<ver>, config-<ver>; updates grub
+make INSTALL_MOD_PATH=<dir>/ modules_install   # default /lib/modules/<ver>/
+\end{lstlisting}
+    \textbf{Cross-compile (embedded):} pass \texttt{ARCH} (= subdir in \texttt{arch/})
+    and \texttt{CROSS\_COMPILE} (tool prefix):
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+make ARCH=arm CROSS_COMPILE=arm-linux-
+\end{lstlisting}
+    \textbf{Yocto} handles all compiler switches:
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+bitbake virtual/kernel -c menuconfig   # configure
+bitbake virtual/kernel                 # compile
+\end{lstlisting}
+\end{KR}
+
+\subsection{Booting the Kernel}
+
+\begin{KR}{Boot with U-Boot}
+    \begin{enumerate}
+        \item load \texttt{zImage} at address X
+        \item load \texttt{<board>.dtb} at address Y
+        \item start: \texttt{bootz X - Y} (ARM32) or \texttt{booti X - Y} (ARM64/RISC-V)
+    \end{enumerate}
+    U-Boot passes the \important{DTB} alongside the kernel. Kernel command line:
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+console=ttyS0 root=/dev/mmcblk0p2 rootwait
+\end{lstlisting}
+    (\texttt{root=} root FS, \texttt{console=} destination of kernel messages.)
+\end{KR}
+
+\mult{2}
+
+\begin{definition}{First Process: /sbin/init}
+    First process, \important{ancestor of all}; controls runlevels:
+    \begin{itemize}
+        \item 0 shutdown, 1 single-user
+        \item 2 multi-user (no NFS), 3 full multi-user
+        \item 5 X11, 6 reboot
+    \end{itemize}
+    Runs startup/shutdown scripts per runlevel.
+\end{definition}
+
+\begin{definition}{Shutdown}
+    Use \texttt{/bin/shutdown} -- never pull the plug (buffered writes $\to$ corrupt
+    FS). \texttt{init} sends \important{SIGTERM} then \important{SIGKILL}.
+    \begin{itemize}
+        \item \texttt{-h} halt, \texttt{-r} reboot, \texttt{-p} poweroff
+        \item Ctrl-Alt-Del defined in \texttt{/etc/inittab}
+    \end{itemize}
+\end{definition}
+
+\multend
+
+\subsection{System Calls}
+
+%% >>> IMAGE (slide 34): ARM ISR/exception vector table (Reset, NMI, HardFault, SVC #11 at 0x2C, SysTick, IRQ0..239) <<<
+
+\begin{concept}{System Calls}
+    The main interface between \important{user space} and the \important{kernel}
+    (\textasciitilde300 calls). They:
+    \begin{itemize}
+        \item make programming easier (kernel handles HW specifics)
+        \item increase security (kernel checks each request)
+        \item provide portability (stable interface, changing implementation)
+    \end{itemize}
+    Wrapped by the C library -- \important{no direct access}.
+\end{concept}
+
+\begin{definition}{Kernel Mode vs. User Mode}
+    \begin{itemize}
+        \item \important{Kernel mode} (privileged): full, unrestricted HW access;
+              any instruction/address; a crash \important{crashes the system}
+        \item \important{User mode}: no direct HW/memory access (only via syscalls);
+              crashes are \important{recoverable}; most code runs here
+    \end{itemize}
+\end{definition}
+
+\begin{example2}{Exam Quiz: Kernel Mode (privileged)? (slide 33)}
+    Select one or more:
+    \begin{enumerate}
+        \item Allows access to all underlying hardware
+        \item The system can recover from program crashes
+        \item Reserved for the most safety-critical OS functions
+        \item Programs mostly run in privileged mode
+    \end{enumerate}
+    \tcblower
+    \important{Correct: (1) and (3).}
+    (2) false -- a kernel-mode crash takes down the system; (4) false -- most code
+    runs in \emph{user} mode.
+\end{example2}
+
+\begin{KR}{Invoke a System Call on ARM}
+    Triggered by a \important{supervisor call} (software interrupt) \texttt{SVC \#0}:
+    \begin{itemize}
+        \item \texttt{r7} = system call number (from \texttt{arch/arm/kernel/calls.S})
+        \item \texttt{r0--r2} = arguments
+        \item \texttt{SVC \#0} $\to$ switch to kernel mode, execute, return
+    \end{itemize}
+    Example -- write "Hello World" to stdout (\texttt{sys\_write} = 4):
+\begin{lstlisting}[style=basesmol, aboveskip=2pt, belowskip=2pt]
+HelloWorldString: .ascii "Hello World\n"
+main:
+mov r7, #4          /* sys_write */
+mov r0, #1          /* stdout = 1 */
+ldr r1, =HelloWorldString
+mov r2, #12         /* string length */
+svc #0
+\end{lstlisting}
+\end{KR}
+
+\begin{remark2}{Modifying the Syscall Table}
+    One can in principle replace an entry in \texttt{sys\_call\_table[\_\_NR\_open]}
+    with a custom function (e.g. spy code). \important{But} in modern kernels the
+    table is in \texttt{.rodata} (read-only) -- writing to it \important{instantly
+    crashes} the system.
+\end{remark2}
+
+\subsection{eBPF (extended Berkeley Packet Filter)}
+
+%% >>> IMAGE (slide 41): eBPF flow -- BPF program -> LLVM/Clang -> bytecode -> eBPF verifier + JIT -> kernel; BPF maps shared with user space <<<
+
+\begin{concept}{eBPF}
+    Runs \important{sandboxed} programs in kernel space \important{without} kernel
+    modules or source changes.
+    \begin{itemize}
+        \item \important{In-kernel verifier}: static analysis $\to$ can't crash/hang the kernel
+        \item \important{event-driven}: attach to syscalls, packets, kprobes
+        \item \important{JIT compiled} (near-native), uses LLVM; \important{no loops}
+        \item user $\leftrightarrow$ kernel via eBPF \important{"maps"}
+    \end{itemize}
+\end{concept}
+
+\begin{examplecode}{eBPF with BCC in Python (slide 42)}
+\begin{lstlisting}[language=Python, style=basesmol, aboveskip=2pt, belowskip=2pt]
+from bcc import BPF
+BPF_SOURCE_CODE = r"""
+TRACEPOINT_PROBE(syscalls, sys_enter_mkdirat) {
+bpf_trace_printk("Wow, new directory: %s\n", args->pathname);
+return 0;
+}
+"""
+bpf = BPF(text=BPF_SOURCE_CODE)
+while True:                       # event loop
+(task, pid, cpu, flags, ts, msg) = bpf.trace_fields()
+print("%-6d %s" % (pid, msg))
+\end{lstlisting}
+\end{examplecode}
+
+\subsection{System Logging}
+
+\begin{definition}{Kernel \& System Messages}
+    \begin{itemize}
+        \item \texttt{dmesg} -- kernel message \important{ring buffer} (last \textasciitilde200 msgs)
+        \item \texttt{cat /var/log/messages} -- kernel + system info via the syslog daemon
+    \end{itemize}
+\end{definition}
+
+\begin{formula}{Console Log Levels}
+    \begin{tabular}{l|c|l}
+        \texttt{KERN\_EMERG}   & 0 & system unstable / about to crash \\
+        \texttt{KERN\_ALERT}   & 1 & act immediately \\
+        \texttt{KERN\_CRIT}    & 2 & critical (HW/SW failure) \\
+        \texttt{KERN\_ERR}     & 3 & error (often driver HW issues) \\
+        \texttt{KERN\_WARNING} & 4 & warning \\
+        \texttt{KERN\_NOTICE}  & 5 & notable (e.g. security) \\
+        \texttt{KERN\_INFO}    & 6 & informational \\
+        \texttt{KERN\_DEBUG}   & 7 & debug \\
+    \end{tabular}
+    \vspace{1mm}\\
+    Aliases in C: \texttt{pr\_emerg}\dots\texttt{pr\_debug}. View/set console level:
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+cat /proc/sys/kernel/printk   # current default minimum boot-default
+echo 8 > /proc/sys/kernel/printk   # show all logs
+\end{lstlisting}
+\end{formula}
+
+\raggedcolumns

@@ -1,0 +1,254 @@
+\section{06 ARM Architectures}
+
+\subsection{RISC vs. CISC}
+
+\begin{definition}{RISC vs. CISC}
+    \begin{center}
+    \begin{tabular}{l|l}
+        \important{CISC} & \important{RISC} \\\hline
+        variable cycles/instr & \textasciitilde1 cycle/instr \\
+        many instr sizes/formats & one size \& format \\
+        pipelining difficult & pipelining easy \\
+        memory-register arch & \important{load/store} arch \\
+        more addressing modes & fewer modes \\
+        fewer registers & \important{more} registers \\
+        complex cores & simple cores \\
+        simple compiler & complex compiler \\
+        emphasis on HW & emphasis on SW \\
+    \end{tabular}
+    \end{center}
+\end{definition}
+
+\subsection{Pipelining}
+
+%% >>> IMAGE (slide 3 / 5): pipeline stages fe/de/ex and sequential-vs-pipelined timing diagram <<<
+
+\begin{concept}{Pipelining Principle}
+    Split instruction execution into stages (Cortex-M3: \important{fe} fetch,
+    \important{de} decode, \important{ex} execute) and overlap them, like an
+    \important{assembly line}.
+    \begin{itemize}
+        \item After the pipeline is filled, one instruction finishes \emph{every} stage
+        \item Requires: equal time per stage, no inter-stage dependencies
+        \item Stage count is a design choice (typically \important{2--12})
+    \end{itemize}
+\end{concept}
+
+\begin{formula}{Throughput (Instructions per Second)}
+    \begin{itemize}
+        \item without pipelining: $\dfrac{1}{\text{instruction delay}}$
+        \item with pipelining: $\dfrac{1}{\text{max stage delay}}$
+    \end{itemize}
+    \important{Cortex-M3} (stages 3/4/5 ns, sum 12 ns):
+    $$\tfrac{1}{12\,\text{ns}} = 83.3\ \text{MIPS} \quad\to\quad \tfrac{1}{5\,\text{ns}} = 200\ \text{MIPS}$$
+\end{formula}
+
+\mult{2}
+
+\begin{definition}{CPI (Cycles per Instruction)}
+    \begin{itemize}
+        \item all-register ops $\to$ 6 instr in 6 cycles, \important{CPI = 1}
+        \item \texttt{LDR}: read must finish on the bus before write-back (one
+              write-back port) $\to$ 6 instr in 7 cycles, \important{CPI = 1.2}
+    \end{itemize}
+\end{definition}
+
+\begin{corollary}{Pros \& Cons}
+    \begin{itemize}
+        \item[+] big performance gain; simpler per-stage HW $\to$ higher clock
+        \item[$-$] every stage must handle every instr; all stages need memory
+              access simultaneously
+    \end{itemize}
+\end{corollary}
+
+\multend
+
+\subsection{Pipeline Hazards}
+
+\begin{concept}{Three Hazard Types}
+    \begin{itemize}
+        \item \important{Control} -- branches: outcome unknown when the next instr
+              must be fetched
+        \item \important{Data} -- an instr uses data modified in another stage:
+              \important{RAW} (read-after-write, true dep), \important{WAR}
+              (anti-dep), \important{WAW} (output dep)
+        \item \important{Structural} -- two instr need the same HW unit at once
+    \end{itemize}
+\end{concept}
+
+\begin{examplecode}{Control Hazard -- branch stall (slide 12)}
+    Conditional branch taken $\to$ \important{3 cycles} to resolve (worst case):
+\begin{lstlisting}[language=armasm, style=basesmol, aboveskip=2pt, belowskip=2pt]
+CMP   R0, R1      ; R0 > R1 ?
+BHI   go_on       ; if higher -> jump (outcome unknown at fetch)
+MOVS  R3, #5      ; <- fetched but may need to be discarded (stall)
+\end{lstlisting}
+\end{examplecode}
+
+\mult{2}
+
+\begin{examplecode}{Data Hazard -- RAW (slide 14)}
+    On a 4-stage pipe (fe/de/ex/wb); \emph{not} on the 3-stage Cortex-M3:
+\begin{lstlisting}[language=armasm, style=basesmol, aboveskip=2pt, belowskip=2pt]
+ADDS R1, R2, R3   ; R2+R3 -> R1
+ADDS R5, R4, R1   ; needs R1 before it is written back
+\end{lstlisting}
+\end{examplecode}
+
+\begin{corollary}{Avoiding Structural Hazards}
+    Fetch \important{multiple} instructions at once and \important{earlier} than
+    needed (Cortex-M3 fetches two 16-bit instr per transfer) $\to$ data bus free
+    for other data next cycle.
+\end{corollary}
+
+\multend
+
+\begin{definition}{In-order vs. Out-of-order Execution}
+    \begin{itemize}
+        \item \important{In-order}: static scheduling; if one stalls, all stall;
+              lower power; every CPU
+        \item \important{Out-of-order}: dynamic scheduling; another instr runs while
+              one stalls; only fetch \& commit are in compiler order; higher power;
+              needs a superscalar CPU. Issue in-order $\to$ execute out-of-order
+              $\to$ \important{commit in-order}
+    \end{itemize}
+\end{definition}
+
+\subsection{ARM Cortex Profiles}
+
+%% >>> IMAGE (slide 20): Cortex-M block diagram (core, NVIC, MPU, bus matrix, debug) <<<
+
+\begin{concept}{The Three Profiles (post-2005)}
+    \begin{itemize}
+        \item \important{Cortex-A} -- Application: complex OS \& user apps
+        \item \important{Cortex-R} -- Real-time: deterministic signal processing/control
+        \item \important{Cortex-M} -- Microcontroller: deeply embedded, optimized for cost/power
+    \end{itemize}
+\end{concept}
+
+\begin{formula}{Cortex-M Profile}
+    \resizebox*{\linewidth}{!}{%
+    \begin{tabular}{l|c|c|c|c|c|c}
+         & M0+ & M3 & M4 & M7 & M23 & M33 \\\hline
+        arch & v6-M & v7-M & v7E-M & v7E-M & v8-M & v8-M \\
+        MPU & y & y & y & y & y & y \\
+        DSP & n & n & y & y & n & y \\
+        FPU & n & n & y & y & n & y \\
+        pipeline & 2 & 3 & 3 & 6 & 2 & 3 \\
+        DMIPS/MHz & 0.93 & 1.25 & 1.55 & 2.14 & 0.98 & 1.5 \\
+    \end{tabular}}
+    \vspace{1mm}\\
+    All use the \important{Thumb-2} instruction set.
+\end{formula}
+
+\mult{2}
+
+\begin{definition}{Cortex-R}
+    Real-time, deterministic; for safety-critical use (medical, aviation, automotive).
+    \begin{itemize}
+        \item \important{Dual-core lock-step}, fault detection via BIST
+        \item ARM/Thumb-2, DSP + FPU, HW divider
+        \item 8-stage pipeline, tightly-coupled memories (TCM), multi-level MPU
+        \item low-latency interrupt controller
+    \end{itemize}
+\end{definition}
+
+\begin{definition}{Cortex-A}
+    Application processors (ARMv8-A $\to$ ARMv9.2-A); 64-bit, big/LITTLE families.
+    \begin{itemize}
+        \item little (A53/A55/A520) vs big (A57/A72/A7x) cores
+        \item ISA \texttt{Thumb-2}/ARM/A64; newest are \important{A64-only}
+        \item pipeline 8\dots variable; in-order $\to$ out-of-order
+    \end{itemize}
+\end{definition}
+
+\multend
+
+\subsection{ARM big.LITTLE}
+
+%% >>> IMAGE (slides 25-27): the three big.LITTLE operating modes <<<
+
+\begin{definition}{Three Operating Modes}
+    Pairs power-hungry "big" cores with efficient "LITTLE" cores:
+    \begin{itemize}
+        \item \important{Clustered switching}: big \& little in separate clusters;
+              only \emph{one cluster} active (high load $\to$ big); OS sees 4 CPUs
+        \item \important{In-kernel switcher}: one big + one little form a virtual
+              core; one real core powered at a time; OS sees 4 CPUs
+        \item \important{Heterogeneous MP (HMP)}: \emph{all} cores can run at once;
+              heavy/high-priority tasks $\to$ big, background $\to$ little; OS sees 8 CPUs
+    \end{itemize}
+\end{definition}
+
+\begin{remark}
+    \important{Xilinx Versal}: combines scalar engines (Arm dual-core Cortex-R5F),
+    adaptable engines (FPGA), and intelligent engines (AI/DSP), linked by a
+    network-on-chip.
+\end{remark}
+
+\subsection{Debugging}
+
+%% >>> IMAGE (slide 32): SWD/JTAG debug interface (debug host -> interface HW -> SWDIO/SWCLK -> Cortex-M3 DAP) <<<
+
+\begin{concept}{Invasive vs. Non-Invasive Debugging}
+    \begin{itemize}
+        \item \important{Invasive}: stop/step, breakpoints, read/write memory \&
+              registers, change ROM code (flash patch)
+        \item \important{Non-invasive (tracing)}: observe while running normally --
+              real-time recording via \important{ETM} (Embedded Trace Macro), data
+              recording, inserted \texttt{printf} messages
+    \end{itemize}
+\end{concept}
+
+\mult{2}
+
+\begin{definition}{ICE \& SWD}
+    \begin{itemize}
+        \item \important{In-Circuit Emulator (ICE)}: special CPU version with extra
+              control/monitor signals; HW need not be functional; real-time;
+              head is type-specific
+        \item \important{Serial Wire Debug (SWD)}: only \important{2 wires}
+              (\texttt{SWDIO} + \texttt{SWCLK}); runs the JTAG protocol on top
+    \end{itemize}
+\end{definition}
+
+\begin{definition}{GNU Debugger (GDB)}
+    Stallman 1986, GPL, modelled after DBX.
+    \begin{itemize}
+        \item runs behind DDD, Eclipse, QT-Creator
+        \item remote debugging via a debug server; \important{not} real-time
+    \end{itemize}
+\end{definition}
+
+\multend
+
+\begin{KR}{Compile \& Debug with GDB}
+    Build with symbols (\texttt{-g}) and warnings (\texttt{-Wall}), then run with TUI:
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+gcc -g -Wall -o main main.c
+gdb main -tui
+\end{lstlisting}
+    Common commands: \texttt{run}/\texttt{r}, \texttt{print}/\texttt{p} \emph{var},
+    \texttt{break}/\texttt{b} \emph{line} (\texttt{... if cond} = conditional),
+    \texttt{clear}, \texttt{next}/\texttt{n} (skip funcs), \texttt{step}/\texttt{s}
+    (enter funcs), \texttt{continue}/\texttt{c}.
+\end{KR}
+
+\subsection{RISC-V}
+
+\begin{definition}{RISC-V}
+    Open \important{load/store} ISA, three base architectures \important{RV32I /
+    RV64I / RV128I} (I = integer), module-based -- the same instructions adapt
+    across all three (128-bit set intentionally not yet finalized).
+\end{definition}
+
+\begin{corollary}{RISC-V vs. ARM/Intel}
+    \begin{itemize}
+        \item base instructions: \important{47} (RISC-V) vs 1500+ (legacy x86)
+        \item ISA: \important{modular} \& incremental vs legacy
+        \item license/royalties: \important{free \& unlimited} vs \$\$\$
+        \item ecosystems growing rapidly (open \& proprietary cores)
+    \end{itemize}
+\end{corollary}
+
+\raggedcolumns

@@ -1,0 +1,170 @@
+\section{09 Linux Licenses}
+
+\subsection{GPL (GNU General Public License)}
+
+\begin{concept}{GPL \& the Four Freedoms}
+    A \important{copyleft} license: derivative works must be released under the
+    \important{same} license, and the \important{source code must be available}.
+    The four freedoms:
+    \begin{itemize}
+        \item \textbf{0} run the program for any purpose
+        \item \textbf{1} study \& modify it
+        \item \textbf{2} redistribute copies
+        \item \textbf{3} distribute your modified versions
+    \end{itemize}
+    Covers \textasciitilde30--35\% of free software (Linux kernel, BusyBox, MySQL).
+\end{concept}
+
+\begin{definition}{Linux Kernel = GPLv2}
+    \begin{itemize}
+        \item \important{Receive/buy} a Linux device $\to$ you get the sources +
+              the right to study, modify, redistribute
+        \item \important{Produce} a Linux device $\to$ you must release the sources
+              to the recipient with the \emph{same} rights, no restriction
+        \item Programs linked against a GPL library must \important{also be GPL}
+    \end{itemize}
+\end{definition}
+
+\begin{corollary}{Tivoization $\to$ GPLv3}
+    \important{Tivoization}: hardware only runs manufacturer-\emph{signed} software,
+    so modified open-source code can't run on the device. TiVo \emph{complied} with
+    GPLv2 (source available) but the modified builds were unusable $\to$ violated the
+    \emph{spirit} of copyleft. \important{GPLv3} (2007) adds: the user must be able to
+    \important{run modified versions on the device} (+ explicit patent grant).
+\end{corollary}
+
+\begin{KR}{GPL: Must I Provide Source Code?}
+    \begin{itemize}
+        \item \important{Not until you distribute} -- keep modifications secret until
+              product delivery
+        \item When distributing a \important{binary}, do \emph{one} of:
+        \begin{itemize}
+            \item ship the source on a physical medium, \emph{or}
+            \item give a network address where the source is found, \emph{or}
+            \item include a \important{written offer valid 3 years} to fetch the source
+        \end{itemize}
+        \item Don't want to provide source? $\to$ link against \important{LGPL} instead
+    \end{itemize}
+\end{KR}
+
+\subsection{LGPL (Lesser GPL)}
+
+\begin{definition}{LGPL}
+    Copyleft, but \important{lighter} -- \textasciitilde10\% of projects (mostly libraries).
+    \begin{itemize}
+        \item modified versions of the library $\to$ same license
+        \item a program \important{linked} against an LGPL library may stay
+              \important{proprietary}
+        \item \emph{condition}: user must be able to \important{update the library
+              independently} $\to$ use \important{dynamic linking}
+        \item used by the C libraries (glibc, uClibc). Exceptions: MySQL (GPL or pay),
+              Qt $\leq$4.4 GPL / $\geq$4.5 LGPLv3 or commercial
+    \end{itemize}
+\end{definition}
+
+\subsection{Licensing in Practice}
+
+\begin{example2}{Exam Example: What is your obligation? (slides 9--10)}
+    \begin{enumerate}
+        \item Modify the Linux kernel / BusyBox / U-Boot (GPL)
+        \item Modify the C library or another LGPL library
+        \item Write an app that \emph{uses} LGPL libraries (e.g. glibc)
+        \item Modify non-copyleft (permissive) software
+    \end{enumerate}
+    \tcblower
+    \begin{itemize}
+        \item (1) GPL $\to$ \important{provide source code}
+        \item (2) LGPL modified $\to$ \important{provide source code}
+        \item (3) keep app \important{proprietary}, but \important{link dynamically}
+              with the LGPL library
+        \item (4) keep modifications proprietary, but \important{credit the authors}
+    \end{itemize}
+\end{example2}
+
+\begin{remark}
+    \important{Abusing kernel licensing:} Nvidia puts a \emph{wrapper} between its
+    proprietary driver and the GPL kernel. Current trend: hide logic in
+    \important{firmware or userspace} and keep the GPL kernel driver almost empty --
+    it just blindly writes incoming binaries to hardware or exposes a large MMIO
+    region to userspace via \texttt{mmap}.
+\end{remark}
+
+\subsection{Permissive Licenses}
+
+\mult{2}
+
+\begin{definition}{MIT \& BSD}
+    "Do whatever you want, no obligation to the owner."
+    \begin{itemize}
+        \item permits use, redistribution, modification
+        \item \important{source NOT required} to be distributed
+        \item only requirement: keep the \important{copyright notice + warranty
+              disclaimer} (include a license copy)
+        \item MIT also explicitly allows merge, publish, sublicense, sell
+        \item Apple uses \important{BSD} in macOS
+    \end{itemize}
+\end{definition}
+
+\begin{definition}{MPL \& Apache}
+    \begin{itemize}
+        \item \important{MPL} (Mozilla, from Netscape 1998): \important{weak/file-level
+              copyleft} -- modified MPL \emph{files} stay MPL, but a larger work can use
+              other terms (e.g. Firefox)
+        \item \important{Apache 2.0}: permissive + explicit \important{patent grant};
+              must state changes \& keep notices; no source disclosure required
+    \end{itemize}
+\end{definition}
+
+\multend
+
+\subsection{Summary Comparison}
+
+\begin{formula}{License Comparison}
+    \resizebox*{\linewidth}{!}{%
+    \begin{tabular}{l|l|c|l}
+        License & Type & Source? & Same license scope \\\hline
+        \important{GPLv2/v3} & strong copyleft & \important{yes} & whole work \\
+        \important{LGPLv3} & weak copyleft & yes & library only \\
+        \important{MPL 2.0} & weak copyleft & yes & per file \\
+        \important{MIT} & permissive & \important{no} & -- \\
+        \important{BSD 2/3} & permissive & no & -- \\
+        \important{Apache 2.0} & permissive & no & -- (+ patent) \\
+    \end{tabular}}
+    \vspace{1mm}\\
+    All require keeping the \important{license + copyright notice}; all disclaim
+    liability \& warranty. GPLv3/LGPLv3/Apache add an express \important{patent grant};
+    GPLv3/Apache also require \important{stating changes}.
+\end{formula}
+
+\subsection{Sample Exam (2019)}
+
+\begin{example2}{Exam: Licenses (Task 1)}
+    \begin{itemize}
+        \item Sell an app \emph{without} releasing source? $\to$ compile against an
+              \important{LGPL} library (e.g. glibc) and \important{link dynamically}
+        \item Sell a kernel driver without source? $\to$ \important{No} -- the kernel
+              is \important{GPL, not LGPL}
+        \item \texttt{lsmod} shows \texttt{Tainted: P}? $\to$ a loaded module is
+              \important{not declared GPL} (proprietary)
+    \end{itemize}
+\end{example2}
+
+\subsection{Exam Exercise (Probepr\"ufung 2021)}
+
+\begin{example2}{Exam 2021 A1: Licenses}
+    \begin{enumerate}
+        \item Sell a Linux application \emph{without} releasing the source -- exact
+              conditions (compilation type + library type)?
+        \item Sell a hardware \emph{kernel driver} without source -- possible?
+        \item \texttt{lsmod} shows \texttt{Tainted: P}. What does it mean?
+    \end{enumerate}
+    \tcblower
+    \begin{itemize}
+        \item (1) compile against an \important{LGPL} library (e.g. glibc) and link
+              it \important{dynamically}
+        \item (2) \important{No} -- the kernel is \important{GPL}, not LGPL
+        \item (3) a loaded module is \important{not declared GPL} (proprietary)
+    \end{itemize}
+\end{example2}
+
+\raggedcolumns
