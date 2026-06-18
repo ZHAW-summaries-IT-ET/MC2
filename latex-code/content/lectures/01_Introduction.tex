@@ -103,6 +103,7 @@
 \end{theorem}
 
 %% >>> IMAGE (slide 14): Yocto layer-stack overview (bottom->top): oe-core (meta) | meta-yocto-bsp (= board support package) | meta-yocto | other layers <<<
+\includegraphics[width=\linewidth]{yocto_layers.png}
 
 \begin{example2}{Exam Quiz: Which statements about Yocto are true? (slide 14)}
     Select one or more (multiple choice):
@@ -134,9 +135,12 @@
     \end{itemize}
 \end{KR}
 
+\includegraphics[width=\linewidth]{yocto_how_it_works.png}
+
 \paragraph{Concept \& Directory Structure}
 
 %% >>> IMAGE (slide 18): Yocto concept -- "poky-mickledore" folder + "Additional Layers" (meta-mc2, meta-raspberrypi) both feed (arrows) into the generated "build" folder <<<
+\includegraphics[width=\linewidth]{yocto_concept.png}
 
 \mult{2}
 
@@ -181,8 +185,6 @@ rm -rf tmp
 bitbake -c cleansstate core-image-minimal
 \end{lstlisting}
 \end{definition}
-
-%% >>> IMAGE (slides 20-22): directory trees -- poky/ (bitbake, meta, meta-yocto, meta-yocto-bsp, scripts) and build/ (conf, downloads, sstate-cache, tmp) <<<
 
 \subsection{Configuring the System}
 
@@ -304,8 +306,6 @@ bitbake-layers add-layer    ../meta-student
     of tasks, all run through BitBake.
 \end{concept}
 
-%% >>> IMAGE (slide 39): recipe directory structure -- recipes-myapps/hello/{files/GPL-2, hello.c, hello_1.0.bb} (note the underscore before the version) <<<
-
 \begin{definition}{A .bb Recipe = 3 Parts}
     \subparagraph{Header}
     \begin{itemize}
@@ -408,7 +408,7 @@ core-image-full-cmdline-raspberrypi4-64.wic.bz2 \
     \end{itemize}
 \end{example2}
 
-\subsection{Exam Exercise (Probepr\"ufung 2021)}
+\subsection{Exam Exercise}
 
 \begin{example2}{Exam 2021 A1: Yocto basics}
     \begin{enumerate}

@@ -52,7 +52,7 @@
 \subsection{Embedded Hardware \& Architecture}
 
 %% >>> IMAGE (slide 6): simplified Linux system -- Userspace (apps, C library) on top, Linux kernel (task/memory mgmt, networking, device drivers, filesystems), Hardware at the bottom <<<
-
+\includegraphics[width=\linewidth]{simplified_linux_system.png}
 \mult{2}
 
 \begin{concept}{Linux System Structure}
@@ -71,6 +71,8 @@
         \item \important{/sbin/init} -- starts userspace services \& shell
     \end{enumerate}
 \end{definition}
+
+\includegraphics[width=\linewidth]{simplified_boot_sequence.png}
 
 \multend
 
@@ -117,6 +119,8 @@
               fs on unknown block(0,0)"} $\to$ append a correct \texttt{root=}
     \end{itemize}
 \end{concept}
+
+\includegraphics[width=\linewidth]{fille_structure_root.png}
 
 \begin{example2}{Exam Quiz: What is true about the root filesystem? (slide 11)}
     Select one or more:
@@ -237,6 +241,8 @@ devtmpfs                       666M    0  666M   0% /dev
     \end{itemize}
 \end{concept}
 
+\includegraphics[width=\linewidth]{host_vs_target.png}
+
 \mult{2}
 
 \begin{definition}{Native vs. Cross Toolchain}
@@ -248,6 +254,8 @@ devtmpfs                       666M    0  666M   0% /dev
         \item Native-on-target: runs on \& builds for the target
     \end{itemize}
 \end{definition}
+
+\includegraphics[width=\linewidth]{cross_compiling_tc.png}
 
 \begin{definition}{Embedded Linux Solutions}
     \begin{itemize}
@@ -274,6 +282,8 @@ devtmpfs                       666M    0  666M   0% /dev
               standard C API (\texttt{printf}\dots); chosen when GCC is compiled
     \end{enumerate}
 \end{definition}
+
+\includegraphics[width=\linewidth]{toolchain_components.png}    
 
 \subsection{C Libraries \& BusyBox}
 
