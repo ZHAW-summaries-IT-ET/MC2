@@ -2,7 +2,7 @@
 
 \subsection{Kernel Modules (LKM)}
 
-%% >>> IMAGE (slide 9): build-up concept -- LKM -> Platform Driver -> + Device Tree -> Access Hardware (GPIO) -> /sys file, driving a 7-segment display <<<
+IMAGE (slide 9): build-up concept -- LKM -> Platform Driver -> + Device Tree -> Access Hardware (GPIO) -> /sys file, driving a 7-segment display <<<
 
 \begin{concept}{Loadable Kernel Module (LKM)}
     A programming module that bridges user/application and hardware. Added
@@ -249,9 +249,13 @@ device_remove_file(&pdev->dev, &dev_attr_counter);   // in remove
     e.g. \texttt{.../sevenseg/fe200000.sevenseg/counter} ($\to$ \texttt{echo}/\texttt{cat}).
 \end{KR}
 
+\raggedcolumns
+\columnbreak
+
+
 \subsection{Interrupts}
 
-%% >>> IMAGE (slide 44): BCM2711 interrupt routing -- 62 peripheral IRQs through VideoCore + ARM GIC to the 4 ARM cores <<<
+IMAGE (slide 44): BCM2711 interrupt routing -- 62 peripheral IRQs through VideoCore + ARM GIC to the 4 ARM cores <<<
 
 \begin{concept}{Interrupt Controller vs. Handler}
     \begin{itemize}
@@ -322,6 +326,10 @@ return 0;
 // remove(): kthread_stop(pdata->kthread);
 \end{lstlisting}
 \end{examplecode}
+
+\raggedcolumns
+\columnbreak
+
 
 \subsection{Putting It Together (Lab 5--6)}
 

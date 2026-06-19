@@ -1,7 +1,5 @@
 \section{07 Scheduling}
 
-\subsection{Processes \& Threads}
-
 \mult{2}
 
 \begin{concept}{Process vs. Thread}
@@ -32,8 +30,10 @@
 
 \subsection{Linux Scheduling Policies}
 
-\begin{definition}{Scheduling Policies}
-    \begin{center}
+
+\mult{2}
+
+\begin{center}
     \begin{tabular}{l|l|c}
         Algorithm & Policy & RT \\\hline
         Completely Fair Sched. & \texttt{SCHED\_OTHER} & no \\
@@ -43,19 +43,6 @@
         Run when nothing else & \texttt{SCHED\_IDLE} & no \\
     \end{tabular}
     \end{center}
-\end{definition}
-
-\mult{2}
-
-\begin{concept}{Completely Fair Scheduler (CFS)}
-    Standard Linux scheduler (\texttt{SCHED\_OTHER}) since kernel 2.6.23.
-    \begin{itemize}
-        \item distributes weighted runtime evenly; \important{vruntime} = runtime
-              weighted by priority
-        \item red-black tree sorted by vruntime; \important{leftmost} (least CPU) runs next
-        \item timeslices typ. 4--24 ms; \important{not} for real-time (unpredictable)
-    \end{itemize}
-\end{concept}
 
 \begin{definition}{Good vs. Bad Delay}
     \begin{itemize}
@@ -67,6 +54,16 @@
 \end{definition}
 
 \multend
+
+\begin{concept}{Completely Fair Scheduler (CFS)}
+    Standard Linux scheduler (\texttt{SCHED\_OTHER}) since kernel 2.6.23.
+    \begin{itemize}
+        \item distributes weighted runtime evenly; \important{vruntime} = runtime
+              weighted by priority
+        \item red-black tree sorted by vruntime; \important{leftmost} (least CPU) runs next
+        \item timeslices typ. 4--24 ms; \important{not} for real-time (unpredictable)
+    \end{itemize}
+\end{concept}
 
 \subsection{Real-Time Schedulers: FIFO \& RR}
 

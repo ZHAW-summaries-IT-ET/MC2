@@ -51,7 +51,9 @@
 
 \subsection{Embedded Hardware \& Architecture}
 
-%% >>> IMAGE (slide 6): simplified Linux system -- Userspace (apps, C library) on top, Linux kernel (task/memory mgmt, networking, device drivers, filesystems), Hardware at the bottom <<<
+IMAGE (slide 6): simplified Linux system -- Userspace (apps, C library) on top, Linux kernel (task/memory mgmt, networking, device drivers, filesystems), Hardware at the bottom <<<
+
+
 
 \mult{2}
 
@@ -71,6 +73,8 @@
         \item \important{/sbin/init} -- starts userspace services \& shell
     \end{enumerate}
 \end{definition}
+
+\includegraphics[width=\linewidth]{simple_boot_sequence.png}
 
 \multend
 
@@ -105,6 +109,9 @@
         \item \important{Custom platform}: own schematics $\to$ write/integrate drivers
     \end{itemize}
 \end{definition}
+
+\raggedcolumns
+\columnbreak
 
 \subsection{Filesystem}
 
@@ -146,7 +153,7 @@
     \end{itemize}
 \end{KR}
 
-%% >>> IMAGE (slide 13): typical Linux file tree under / (bin, boot, dev, etc, home, lib, mnt, proc, root, sys, usr, var ...) <<<
+IMAGE (slide 13): typical Linux file tree under / (bin, boot, dev, etc, home, lib, mnt, proc, root, sys, usr, var ...) <<<
 
 \mult{2}
 
@@ -228,6 +235,8 @@ devtmpfs                       666M    0  666M   0% /dev
 
 \subsection{Toolchain for Embedded Linux}
 
+\mult{2}
+
 \begin{concept}{Host vs. Target}
     \begin{itemize}
         \item \important{Host} -- development PC running Linux
@@ -237,26 +246,32 @@ devtmpfs                       666M    0  666M   0% /dev
     \end{itemize}
 \end{concept}
 
+\includegraphics[width=\linewidth]{host_dev.png}
+
+\multend
+
+\paragraph{Native vs. Cross Toolchain}
+
 \mult{2}
 
-\begin{definition}{Native vs. Cross Toolchain}
-    \begin{itemize}
-        \item \important{Native}: runs on workstation, generates code for the same
+\begin{definition}{Native Toolchain} runs on workstation, generates code for the same
               machine (usually x86)
-        \item \important{Cross-compiling}: runs on workstation (x86), generates code
-              for the target (e.g. ARM)
-        \item Native-on-target: runs on \& builds for the target
-    \end{itemize}
+        
+    \important{Native-on-target}: runs on \& builds for the target
+
+    \includegraphics[width=\linewidth]{native_toolchain.png}
 \end{definition}
 
-\begin{definition}{Embedded Linux Solutions}
-    \begin{itemize}
-        \item \important{Commercial} (own tools, open + proprietary mix): MontaVista,
-              Wind River, TimeSys
-        \item \important{Open source}, community-supported $\to$ \emph{used in this course}
-        \item Host PC: any recent Linux desktop; course uses \important{Fedora}
-    \end{itemize}
+\begin{definition}{Native vs. Cross-compiling Toolchain} 
+    runs on workstation (x86), generates code
+              for the target (e.g. ARM)
+
+    \includegraphics[width=\linewidth]{cross_compile_tooclahin.png}
 \end{definition}
+
+
+
+
 
 \multend
 
@@ -275,45 +290,9 @@ devtmpfs                       666M    0  666M   0% /dev
     \end{enumerate}
 \end{definition}
 
-\subsection{C Libraries \& BusyBox}
-
-\mult{2}
-
-\begin{definition}{C Libraries}
-    \begin{itemize}
-        \item \important{glibc} -- standard GNU/Linux, perf+portable (LGPL);
-              big: \textasciitilde1.7 MB on ARM
-        \item \important{uClibc} -- lightweight for embedded (LGPL), \textasciitilde400 KB
-        \item \important{musl} -- \textasciitilde400 KB, MIT
-        \item \important{dietlibc} -- \textasciitilde185 KB, GPL (stopped 2024)
-    \end{itemize}
-\end{definition}
-
-\begin{definition}{BusyBox}
-    The \important{"Swiss army knife"}: most CLI utilities in a \important{single
-    executable} (even a web server!).
-    \begin{itemize}
-        \item $<$1 MB (static, glibc), $<$500 KB (static, uClibc)
-        \item ls, cp, mount, grep, vi, wget, init, \dots (hundreds)
-    \end{itemize}
-\end{definition}
-
-\multend
-
-\begin{formula}{"Hello World" Size Comparison (slide 44)}
-    \begin{center}
-    \begin{tabular}{l|c|c|c}
-        & static & dynamic & dyn. library \\\hline
-        \important{uClibc} & 18 kB  & 2.5 kB & 400 kB \\
-        \important{glibc}  & 361 kB & 2.7 kB & 1.7 MB \\
-    \end{tabular}
-    \end{center}
-    $\Rightarrow$ uClibc wins massively when \important{statically} linked.
-\end{formula}
-
 \subsection{Building a Minimalistic Linux System}
 
-%% >>> IMAGE (slide 40): minimal Linux stack -- Linux Kernel + C-Library (uClibc/glibc) + Main App (BusyBox) + start process /etc/inittab + pseudo-FS (/proc /dev /sys) on the Root Filesystem, serial link to Host-PC <<<
+IMAGE (slide 40): minimal Linux stack -- Linux Kernel + C-Library (uClibc/glibc) + Main App (BusyBox) + start process /etc/inittab + pseudo-FS (/proc /dev /sys) on the Root Filesystem, serial link to Host-PC <<<
 
 \begin{KR}{Build the Smallest Possible Linux}
     \textbf{Step 1 -- Kernel} (from \texttt{kernel.org}):
@@ -397,6 +376,9 @@ qemu \
     \end{enumerate}
     Boot methods: \important{Method 1} SD-card (Lab1), \important{Method 2} network/NFS (Lab2).
 \end{corollary}
+
+\raggedcolumns
+\columnbreak
 
 \subsection{Inspecting \& Programming the System}
 

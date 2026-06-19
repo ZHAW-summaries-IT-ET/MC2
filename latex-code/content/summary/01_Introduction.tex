@@ -86,7 +86,7 @@
     \end{enumerate}
 \end{theorem}
 
-%% >>> IMAGE (slide 14): Yocto layer-stack overview (bottom->top): oe-core (meta) | meta-yocto-bsp (= board support package) | meta-yocto | other layers <<<
+IMAGE (slide 14): Yocto layer-stack overview (bottom->top): oe-core (meta) | meta-yocto-bsp (= board support package) | meta-yocto | other layers <<<
 
 \includegraphics[width=\linewidth]{yocto_layers.png}
 
@@ -116,7 +116,7 @@
 
 \paragraph{Concept \& Directory Structure}
 
-%% >>> IMAGE (slide 18): Yocto concept -- "poky-mickledore" folder + "Additional Layers" (meta-mc2, meta-raspberrypi) both feed (arrows) into the generated "build" folder <<<
+IMAGE (slide 18): Yocto concept -- "poky-mickledore" folder + "Additional Layers" (meta-mc2, meta-raspberrypi) both feed (arrows) into the generated "build" folder <<<
 
 \mult{2}
 
@@ -162,7 +162,7 @@ bitbake -c cleansstate core-image-minimal
 \end{lstlisting}
 \end{definition}
 
-%% >>> IMAGE (slides 20-22): directory trees -- poky/ (bitbake, meta, meta-yocto, meta-yocto-bsp, scripts) and build/ (conf, downloads, sstate-cache, tmp) <<<
+IMAGE (slides 20-22): directory trees -- poky/ (bitbake, meta, meta-yocto, meta-yocto-bsp, scripts) and build/ (conf, downloads, sstate-cache, tmp) <<<
 
 \subsection{Configuring the System}
 
@@ -240,7 +240,7 @@ bitbake core-image-full-cmdline
     Output lands in \texttt{tmp/deploy/images/<machine>/}.
 \end{KR}
 
-\paragraph{Layers}
+\paragraph{Layers and Recipes}
 
 \begin{KR}{Create \& Add a New Layer}
     \textbf{Step 1 -- create} the layer (adds config dir + optional example recipe):
@@ -252,7 +252,7 @@ bitbake-layers add-layer    ../meta-student
     \textbf{Step 2 -- (alternative) register manually} by adding the layer's
     \important{absolute path} to \texttt{BBLAYERS} in \texttt{build/conf/bblayers.conf}.
 
-    \paragraph{conclusion}
+    \textbf{conclusion}:
     BitBake parses every layer in \texttt{BBLAYERS} and picks up its recipes,
     config files and classes. Layer location on disk does not matter (but keep
     it next to the other layers).
@@ -276,16 +276,11 @@ bitbake-layers add-layer    ../meta-student
 
 \multend
 
-\paragraph{Recipes}
-
 \begin{concept}{Recipe}
     A recipe is the \important{"list of ingredients" + "cooking instructions"} to
     build one or more packages. It holds configuration variables and a common set
     of tasks, all run through BitBake.
 \end{concept}
-
-%% >>> IMAGE (slide 39): recipe directory structure -- recipes-myapps/hello/{files/GPL-2, hello.c, hello_1.0.bb} (note the underscore before the version) <<<
-
 
 
 \begin{definition}{A .bb Recipe -- 3 Parts}\\
@@ -331,12 +326,14 @@ install -m 0755 hello ${D}${bindir}
 \end{corollary}
 \end{minipage}
 
-
 \begin{remark2}{License Checksum}
     \texttt{LIC\_FILES\_CHKSUM} tracks the license file. If the upstream license
     changes, the checksum changes and the \important{build fails} until the recipe
     is updated. Mandatory in every recipe \emph{unless} \texttt{LICENSE = "CLOSED"}.
 \end{remark2}
+
+
+
 
 \subsection{Kochrezepte and Exam Examples}
 
@@ -371,8 +368,6 @@ core-image-full-cmdline-raspberrypi4-64.wic.bz2 \
 \end{lstlisting}
 \end{KR}
 
-\subsection{Exam Exercise (Probepr\"ufung 2021)}
-
 \begin{example2}{Exam 2021 A1: Yocto basics}
     \begin{enumerate}
         \item What is Yocto?
@@ -385,6 +380,31 @@ core-image-full-cmdline-raspberrypi4-64.wic.bz2 \
               custom embedded Linux systems
         \item layer $\to$ \texttt{build/conf/bblayers.conf}
         \item app $\to$ \texttt{build/conf/local.conf}
+    \end{itemize}
+\end{example2}
+
+\begin{example2}{Task 1 -- Yocto \& Licenses}
+    \begin{itemize}
+        \item \important{What is Yocto?} \\ The Yocto Project is a set of \important{templates, tools
+              and methods} that allow building custom embedded Linux-based systems.
+        \item \important{Yocto config file}: You want to add a new layer \texttt{mylayer} with your
+              own app \texttt{myapp}.
+              \begin{enumerate}
+                  \item In which Yocto config file do you register \texttt{mylayer}? $\rightarrow$ \texttt{build/conf/bblayers.conf}
+                  \item In which Yocto config file do you register \texttt{myapp}? $\rightarrow$ \texttt{build/conf/local.conf}
+              \end{enumerate} 
+        \item \important{Code Release:} You want to \emph{sell} a Linux application without
+              releasing the source code. State the exact conditions (compilation type
+              + library types) under which you need not release it.\\
+              \important{Solution:} The application must be \important{compiled with an LGPL
+              library} (e.g. \texttt{glibc}) and \important{dynamically linked}.
+        \item You want to \important{sell a hardware kernel driver} without
+              releasing the source. Possible? If yes how, if no why?
+              \important{No} -- the kernel is \important{not LGPL}!
+        \item \important{Tainted P:} \texttt{lsmod} prints \texttt{Tainted: P} in the first
+              line. What does \texttt{Tainted: P} mean here?
+              $\rightarrow$ The kernel has loaded a module that is \important{not
+              declared GPL}.
     \end{itemize}
 \end{example2}
 

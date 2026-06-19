@@ -2,7 +2,7 @@
 
 \subsection{Framework Overview}
 
-%% >>> IMAGE (slide 24): pipeline/bin -- source element (filesrc) -> filter element (decoder) -> sink element (ALSA), connected via src/sink pads <<<
+IMAGE (slide 24): pipeline/bin -- source element (filesrc) -> filter element (decoder) -> sink element (ALSA), connected via src/sink pads <<<
 
 \begin{concept}{GStreamer}
     A free, platform-independent \important{multimedia framework} (play, en-/decode,
@@ -62,6 +62,9 @@ v4l2-ctl --list-devices               # e.g. /dev/video0 (USB webcam)
 v4l2-ctl -d /dev/video0 --list-formats-ext   # formats (YUYV, MJPG), sizes, fps
 \end{lstlisting}
 \end{KR}
+
+\raggedcolumns
+    \columnbreak
 
 \subsection{gst-launch-1.0 Prototyping}
 
@@ -134,9 +137,12 @@ gst-launch-1.0 v4l2src device=/dev/video0 \
     \texttt{rtpsink}/\texttt{udpsink} (stream over network).
 \end{remark}
 
+\raggedcolumns
+    \columnbreak
+
 \subsection{GStreamer C API}
 
-%% >>> IMAGE (slide 59): GStreamer state machine NULL -> READY -> PAUSED (prerolling/prerolled) -> PLAYING <<<
+IMAGE (slide 59): GStreamer state machine NULL -> READY -> PAUSED (prerolling/prerolled) -> PLAYING <<<
 
 \begin{KR}{The 8-Step API Workflow}
     \begin{enumerate}
@@ -175,7 +181,6 @@ gst_object_unref(bin);
 \end{lstlisting}
 \end{examplecode}
 
-\mult{2}
 
 \begin{definition}{State Machine}
     \texttt{NULL} (no resources) $\to$ \texttt{READY} $\to$ \texttt{PAUSED}
@@ -192,7 +197,6 @@ gst_caps_unref(caps);
 \end{lstlisting}
 \end{KR}
 
-\multend
 
 \begin{KR}{Shortcut: gst\_parse\_launch}
     Replaces steps 2--5 with a single \texttt{gst-launch}-style string:

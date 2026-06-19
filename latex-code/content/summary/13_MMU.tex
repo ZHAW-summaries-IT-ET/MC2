@@ -56,7 +56,7 @@
 
 \subsection{Paging}
 
-%% >>> IMAGE (slide 22): virtual addr [VPN|VPO] -> page table (indexed by VPN via PTBR, valid bit) -> physical addr [PPN|PPO], PPO = VPO <<<
+IMAGE (slide 22): virtual addr [VPN|VPO] -> page table (indexed by VPN via PTBR, valid bit) -> physical addr [PPN|PPO], PPO = VPO <<<
 
 \begin{concept}{Paging Principle}
     RAM is split into fixed-size \important{page frames} (typ. 4 kB); a process is
@@ -144,6 +144,8 @@
     (the page table itself lives in main memory).
 \end{example2}
 
+\mult{2}
+
 \begin{example2}{Exercise 1 -- Number of Page Table Entries (slide 41)}
     \# entries $= 2^{\text{VPN}} = \text{virtual address space} / P$:
     \tcblower
@@ -169,6 +171,8 @@
     \end{tabular}
 \end{example2}
 
+\multend
+
 \begin{example2}{Exam Exercise -- 1 kByte Pages (slide 54 / 2021 A8)}
     MMU with \important{1 kByte} pages; page table entries are \important{22 bits}
     (no management bits). Virtual address space = \important{22-bit} (from the diagram).
@@ -183,9 +187,12 @@
     \end{itemize}
 \end{example2}
 
+\raggedcolumns
+\columnbreak
+
 \subsection{User-Space Access: mmap}
 
-%% >>> IMAGE (slide 43): /dev/mem + mmap maps page-aligned GPIO_BASE_ADDR to virtual_gpio_base; access via virtual_gpio_base + gpio_register_offset <<<
+IMAGE (slide 43): /dev/mem + mmap maps page-aligned <<<
 
 \begin{KR}{Memory-Mapped GPIO via mmap}
     \texttt{/dev/mem} exposes physical memory; \texttt{mmap()} returns a

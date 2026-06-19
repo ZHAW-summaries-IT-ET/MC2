@@ -1,7 +1,5 @@
 \section{08 Realtime with Linux}
 
-\subsection{Setting Priorities}
-
 \begin{KR}{Set Priority / Nice in Code}
     \textbf{RT priority} (only \texttt{SCHED\_FIFO}/\texttt{SCHED\_RR}):
 \begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
@@ -25,8 +23,6 @@ renice -n -20 <pid>        # change niceness of a running process
     Niceness: $-20$ (most favourable) \dots $+19$ (least).
 \end{KR}
 
-\subsection{Real-Time A/V Example}
-
 \begin{example2}{Exam Example: A/V Scheduling Strategies (slides 10--15)}
     3 threads (Audio, Video, Control) together need \important{$>$100\%} CPU. What
     happens under each policy?
@@ -44,9 +40,9 @@ renice -n -20 <pid>        # change niceness of a running process
     \end{itemize}
 \end{example2}
 
-\subsection{Interrupt Latency}
+\subsubsection{Interrupt Latency}
 
-%% >>> IMAGE (slide 18): direct IRQ handler (all in interrupt context, blocks all tasks) vs threaded IRQ handler (ISR wakes Task B, scheduled FIFO/RR) <<<
+IMAGE (slide 18): direct IRQ handler (all in interrupt context, blocks all tasks) vs threaded IRQ handler (ISR wakes Task B, scheduled FIFO/RR)
 
 \begin{concept}{Interrupt Latency}
     Time from the external \important{interrupt} until the real-time handler
@@ -193,7 +189,7 @@ if not R2 goto try_again      ; retry if store failed
 
 \subsection{Co-Kernel \& CPU Affinity}
 
-%% >>> IMAGE (slide 44): co-kernel layering -- RT micro-kernel between hardware and the Linux kernel <<<
+IMAGE (slide 44): co-kernel layering -- RT micro-kernel between hardware and the Linux kernel <<<
 
 \begin{definition}{Co-Kernel (Xenomai)}
     Inserts an RT micro-kernel \important{between hardware and Linux} so RT tasks run

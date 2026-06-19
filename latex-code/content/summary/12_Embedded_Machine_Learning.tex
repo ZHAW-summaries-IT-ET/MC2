@@ -1,9 +1,5 @@
 \section{12 Embedded Machine Learning}
 
-\subsection{AI / ML Foundations}
-
-\mult{2}
-
 \begin{concept}{AI $\supset$ ML $\supset$ DL $\supset$ GenAI}
     \begin{itemize}
         \item \important{AI}: emulate human behaviour (learn, decide, recognise)
@@ -26,8 +22,6 @@
         \item non-linearity from an \important{activation function}
     \end{itemize}
 \end{concept}
-
-\multend
 
 \begin{formula}{Neuron Output \& Parameter Count}
     One neuron:
@@ -55,13 +49,13 @@
 
 \subsection{Cost \& Training}
 
-\mult{2}
-
 \begin{concept}{Cost \& Gradient Descent}
     \important{Cost} = how wrong the output is vs the label; \important{lower = better}.
     Training \important{minimises} the cost by walking downhill along its gradient.
     Risk: getting stuck in \important{local minima / saddle points}.
 \end{concept}
+
+\mult{2}
 
 \begin{formula}{Cost / GD / Cross-Entropy}
     Sum of squared differences:
@@ -72,9 +66,8 @@
     $$H(p,q) = -\sum_{x} p(x)\log q(x)$$
 \end{formula}
 
-\multend
 
-\mult{2}
+
 
 \begin{definition}{Optimizers}
     \begin{itemize}
@@ -163,9 +156,12 @@ return int(np.argmax(out))           # most probable digit
     \texttt{AllocateTensors} $\to$ copy input $\to$ \texttt{...Invoke} $\to$ read output.
 \end{KR}
 
+\raggedcolumns
+\columnbreak
+
 \subsection{Convolutional Neural Networks}
 
-%% >>> IMAGE (slide 52): CNN for MNIST -- INPUT 28x28x1 -> Conv 5x5 -> MaxPool 2x2 -> Conv 5x5 -> MaxPool 2x2 -> Flatten -> FC -> 10 outputs <<<
+IMAGE (slide 52): CNN for MNIST -- INPUT 28x28x1 -> Conv 5x5 -> MaxPool 2x2 -> Conv 5x5 -> MaxPool 2x2 -> Flatten -> FC -> 10 outputs <<<
 
 \mult{2}
 

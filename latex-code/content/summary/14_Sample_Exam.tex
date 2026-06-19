@@ -1,0 +1,201 @@
+\section{14 Sample Exam -- Probepr\"ufung FS2019 (with Solutions)}
+
+\subsection{Task 2 -- Kernel Driver [10 P]}
+
+\begin{remark}
+    The kernel module below works together with the device tree of Task 3. Complete
+    the code at \important{10 places} so that a \texttt{'1'} is written to the first
+    GPIO address (defined in the device tree). The completed solution (10 fill-ins
+    marked \texttt{<= n}):
+\end{remark}
+
+\begin{examplecode}{Task 2 -- completed module}
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+#include <linux/kernel.h>
+#include <linux/module.h>
+#include <linux/platform_device.h>
+static int my_module_remove(struct platform_device *pdev) { return 0; }
+static int my_module_probe(struct platform_device *pdev) {
+int res = platform_get_resource(pdev, IORESOURCE_MEM, 0);   // <= 1
+void __iomem *base_addr = devm_ioremap_resource(&pdev->dev, res); // <= 2
+iowrite32(1, base_addr);                                    // <= 3
+return 0;
+}
+static const struct of_device_id my_module_device_tree_ids[] = {
+{ .compatible = "brcm,bcm2711-gpio", },                     // <= 4
+{ }
+};
+MODULE_DEVICE_TABLE(of, my_module_device_tree_ids);         // <= 5
+static struct platform_driver my_module_driver = {
+.driver = { .name = "my_module", .owner = THIS_MODULE,
+.of_match_table = my_module_device_tree_ids, },        // <= 6
+.probe  = my_module_probe,                                  // <= 7
+.remove = my_module_remove,                                 // <= 8
+};
+static int __init my_module_init(void) {
+return platform_driver_register(&my_module_driver);         // <= 9
+}
+static void __exit my_module_exit(void) {
+platform_driver_unregister(&my_module_driver);
+}
+module_init(my_module_init);  module_exit(my_module_exit);
+MODULE_LICENSE("GPL");                                       // <= 10
+\end{lstlisting}
+\end{examplecode}
+
+\subsection{Task 3 -- GPIO [17 P]}
+
+\begin{example2}{Task 3 -- device tree \& GPIO access}
+    A device-tree excerpt for the GPIOs is given.
+    \begin{itemize}
+        \item \important{a)} Name of the kernel driver controlling the GPIOs?
+        \item \important{b)} Size (bytes, hex) of the memory region all GPIO registers occupy?
+        \item \important{c)} (2) Which command-line command finds the gpiochip number
+              needed to drive e.g. GPIO19 through the pseudo-FS in \texttt{/sys/class/gpio}?
+        \item \important{d)} (3) Via c) you found the LED on GPIO19 is at sysfs number
+              \texttt{340}. You are in \texttt{/sys/class/gpio}. Give all commands to
+              switch the LED on.
+        \item \important{e)} (4) Via \texttt{mmap()} you want to read the logical state
+              of a GPIO input (\texttt{GPIO\_LVL} register) with a button. At which
+              Legacy-Master / ARM-View address is the GPIO base address?
+        \item \important{f)} Which value must \texttt{\#define GPIO\_BASE\_ADDR} have?
+        \item \important{g)} (2) The MMU uses a physical page offset of 65\,536 byte and
+              maps \texttt{GPIO\_BASE\_ADDR} to a \texttt{virtual\_gpio\_base} of
+              \texttt{0x84ec0000}. What is the virtual address of \texttt{gpio\_reg}?
+    \end{itemize}
+    \tcblower
+    \begin{itemize}
+        \item \important{a)} \texttt{brcm,bcm2711-gpio}
+        \item \important{b)} \texttt{0xb4}
+        \item \important{c)} \texttt{ls gpiochip*/device/driver}
+        \item \important{d)} \texttt{echo 340 > /sys/class/gpio/export} ;
+              \texttt{echo out > /sys/class/gpio/gpio340/direction} ;
+              \texttt{echo 1 > /sys/class/gpio/gpio340/value}
+        \item \important{e)} Legacy-Master \texttt{0x7e200000}; ARM-View \texttt{0xfe200000}
+        \item \important{f)} \texttt{GPIO\_BASE\_ADDR = 0xfe200000}
+        \item \important{g)} \texttt{0x84ec0034} (offset \texttt{0x34} is within the
+              65\,536-byte page, so it is preserved)
+    \end{itemize}
+\end{example2}
+
+\subsection{Task 4 -- Linux Threads [12 P]}
+
+\begin{examplecode}{Task 4 -- given code (1-core system)}
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+#include <stdio.h>
+#include <pthread.h>
+#define M 3
+int a, b;
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t  cond  = PTHREAD_COND_INITIALIZER;
+void *my_thread(void *ptr) {
+struct sched_param param;
+pthread_mutex_lock(&mutex);
+int c = a++;
+param.sched_priority = c;
+sched_setscheduler(0, SCHED_FIFO, &param);
+pthread_cond_wait(&cond, &mutex);
+printf("Output %d : %d\n", c, b++);
+pthread_mutex_unlock(&mutex);
+}
+int main(int argc, char **argv) {
+int i;  a = 5;  b = 0;
+pthread_t tid[M];
+for (i = 0; i < M; i++)
+pthread_create(&tid[i], NULL, my_thread, NULL);
+usleep(100000);
+pthread_mutex_lock(&mutex);
+pthread_cond_broadcast(&cond);
+pthread_mutex_unlock(&mutex);
+pthread_join(tid[0], NULL);
+}
+\end{lstlisting}
+\end{examplecode}
+
+\begin{example2}{Task 4 -- questions on the code}
+    \begin{itemize}
+        \item \important{a)} (1) How many threads are started?
+        \item \important{b)} (2) Which priorities do the threads have after start?
+              Which has the highest?
+        \item \important{c)} (2) Which Linux scheduling method (code word)? What is it called?
+        \item \important{d)} (1) What does \texttt{pthread\_cond\_broadcast(\&cond)} do in main?
+        \item \important{e)} (3) Are all threads guaranteed to finish before main()
+              ends? If not, fix the code.
+        \item \important{f)} (3) Give the exact console output (assume all threads run
+              fully).
+    \end{itemize}
+    \tcblower
+    \begin{itemize}
+        \item \important{a)} \important{3} threads
+        \item \important{b)} Prio \important{5, 6, 7}; \important{7} has the highest priority
+        \item \important{c)} \texttt{SCHED\_FIFO}; \important{preemptive} scheduling
+        \item \important{d)} Signals \emph{all} threads that they may continue
+        \item \important{e)} \important{No} -- \texttt{pthread\_join(tid[0], NULL)} waits
+              only for the first thread. Fix:\\
+              \texttt{for (i = 0; i < M; i++) pthread\_join(tid[i], NULL);}
+        \item \important{f)} \texttt{Output 7 : 0} / \texttt{Output 6 : 1} / \texttt{Output 5 : 2}
+    \end{itemize}
+\end{example2}
+
+\raggedcolumns
+\columnbreak
+
+\subsection{Task 5 -- Linux Scheduling [14 P]}
+
+\begin{example2}{Task 5a -- policy comparison}
+    Fill the comparison table for the three scheduling policies.
+    \tcblower
+    {\footnotesize\setlength{\tabcolsep}{4pt}%
+    \begin{tabular}{l|c|c|c}
+         & \texttt{SCHED\_OTHER} & \texttt{SCHED\_RR} & \texttt{SCHED\_FIFO} \\\hline
+        priorities / & nice levels & prios 1--99 & prios 1--99 \\
+        nice levels & $-20$ highest & 1 lowest & 1 lowest \\
+        highest/lowest & 19 lowest & 99 highest & 99 highest \\\hline
+        realtime? & no & yes & yes \\\hline
+        preemptable? & yes -- by RT & yes -- by higher & yes -- by \\
+        when? & tasks \& time- & RT task \& RR & higher RT \\
+         & slices & time-slices & task \\\hline
+        round-robin? & RR variable & RR fixed & no round \\
+        slices? & slices & slices & robin \\\hline
+        typical use & GUI & audio/video & audio/video \\
+    \end{tabular}}
+\end{example2}
+
+\begin{example2}{Task 5b -- PREEMPT\_RT vs Xenomai [3 P]}
+    Explain in $\leq$3 sentences the difference between the projects PREEMPT\_RT and
+    Xenomai.
+    \tcblower
+    \begin{itemize}
+        \item \important{PREEMPT\_RT}: make the (single) Linux kernel \important{fully
+              preemptable}
+        \item \important{Xenomai}: a \important{co-kernel} (micro-kernel) that does the
+              scheduling between the real-time tasks and the normal Linux kernel
+    \end{itemize}
+\end{example2}
+
+\subsection{Task 8 -- MMU [10 P]}
+
+\begin{example2}{Task 8 -- MMU dimensioning}
+    The MMU divides the virtual and physical address space into \important{1 kByte}
+    pages. The page-table entries are \important{22 bits} wide (without management bits).
+    \begin{itemize}
+        \item \important{a)} (2) Compute the Virtual Page Offset (VPO) and Physical
+              Page Offset (PPO).
+        \item \important{b)} (3) How large is the physical address space (explanation needed)?
+        \item \important{c)} (3) How many entries does the page table contain
+              (calculation needed)?
+        \item \important{d)} (2) What is the bit width of the Translation Lookaside Buffer?
+    \end{itemize}
+    \tcblower
+    \begin{itemize}
+        \item \important{a)} 1 kByte $= 2^{10}$, so VPO = PPO = \important{10 bit}
+              (VPO and PPO are always equal).
+        \item \important{b)} entries are 22 bit + PPO 10 bit $\to$ physical address
+              space = \important{32 bit}.
+        \item \important{c)} VPO = 10 bit, virtual address space = 22 bit $\to$
+              $22-10 = 12 \to 2^{12} = \important{4096 entries}$.
+        \item \important{d)} physical address in the TLB = \important{22 bit}.
+    \end{itemize}
+\end{example2}
+
+\raggedcolumns

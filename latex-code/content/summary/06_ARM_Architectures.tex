@@ -1,8 +1,6 @@
 \section{06 ARM Architectures}
 
-\subsection{RISC vs. CISC}
-
-\begin{definition}{RISC vs. CISC}
+\begin{minipage}{0.45\linewidth}
     \begin{center}
     \begin{tabular}{l|l}
         \important{CISC} & \important{RISC} \\\hline
@@ -17,11 +15,28 @@
         emphasis on HW & emphasis on SW \\
     \end{tabular}
     \end{center}
+\end{minipage}
+\begin{minipage}{0.54\linewidth}
+        \begin{definition}{RISC-V}
+    Open \important{load/store} ISA, three base architectures \important{RV32I /
+    RV64I / RV128I} (I = integer), module-based -- the same instructions adapt
+    across all three (128-bit set intentionally not yet finalized).
 \end{definition}
+
+\begin{corollary}{RISC-V vs. ARM/Intel}
+    \begin{itemize}
+        \item base instructions: \important{47} (RISC-V) vs 1500+ (legacy x86)
+        \item ISA: \important{modular} \& incremental vs legacy
+        \item license/royalties: \important{free \& unlimited} vs \$\$\$
+        \item ecosystems growing rapidly (open \& proprietary cores)
+    \end{itemize}
+\end{corollary}
+\end{minipage}
+
 
 \subsection{Pipelining}
 
-%% >>> IMAGE (slide 3 / 5): pipeline stages fe/de/ex and sequential-vs-pipelined timing diagram <<<
+IMAGE (slide 3 / 5): pipeline stages fe/de/ex and sequential-vs-pipelined timing diagram <<<
 
 \begin{concept}{Pipelining Principle}
     Split instruction execution into stages (Cortex-M3: \important{fe} fetch,
@@ -35,12 +50,14 @@
 \end{concept}
 
 \begin{formula}{Throughput (Instructions per Second)}
+    \mult{2}
     \begin{itemize}
         \item without pipelining: $\dfrac{1}{\text{instruction delay}}$
         \item with pipelining: $\dfrac{1}{\text{max stage delay}}$
     \end{itemize}
     \important{Cortex-M3} (stages 3/4/5 ns, sum 12 ns):
     $$\tfrac{1}{12\,\text{ns}} = 83.3\ \text{MIPS} \quad\to\quad \tfrac{1}{5\,\text{ns}} = 200\ \text{MIPS}$$
+    \multend
 \end{formula}
 
 \mult{2}
@@ -116,7 +133,7 @@ ADDS R5, R4, R1   ; needs R1 before it is written back
 
 \subsection{ARM Cortex Profiles}
 
-%% >>> IMAGE (slide 20): Cortex-M block diagram (core, NVIC, MPU, bus matrix, debug) <<<
+IMAGE (slide 20): Cortex-M block diagram (core, NVIC, MPU, bus matrix, debug) <<<
 
 \begin{concept}{The Three Profiles (post-2005)}
     \begin{itemize}
@@ -166,7 +183,7 @@ ADDS R5, R4, R1   ; needs R1 before it is written back
 
 \subsection{ARM big.LITTLE}
 
-%% >>> IMAGE (slides 25-27): the three big.LITTLE operating modes <<<
+IMAGE (slides 25-27): the three big.LITTLE operating modes <<<
 
 \begin{definition}{Three Operating Modes}
     Pairs power-hungry "big" cores with efficient "LITTLE" cores:
@@ -188,7 +205,7 @@ ADDS R5, R4, R1   ; needs R1 before it is written back
 
 \subsection{Debugging}
 
-%% >>> IMAGE (slide 32): SWD/JTAG debug interface (debug host -> interface HW -> SWDIO/SWCLK -> Cortex-M3 DAP) <<<
+IMAGE (slide 32): SWD/JTAG debug interface (debug host -> interface HW -> SWDIO/SWCLK -> Cortex-M3 DAP) <<<
 
 \begin{concept}{Invasive vs. Non-Invasive Debugging}
     \begin{itemize}
@@ -234,21 +251,5 @@ gdb main -tui
     (enter funcs), \texttt{continue}/\texttt{c}.
 \end{KR}
 
-\subsection{RISC-V}
-
-\begin{definition}{RISC-V}
-    Open \important{load/store} ISA, three base architectures \important{RV32I /
-    RV64I / RV128I} (I = integer), module-based -- the same instructions adapt
-    across all three (128-bit set intentionally not yet finalized).
-\end{definition}
-
-\begin{corollary}{RISC-V vs. ARM/Intel}
-    \begin{itemize}
-        \item base instructions: \important{47} (RISC-V) vs 1500+ (legacy x86)
-        \item ISA: \important{modular} \& incremental vs legacy
-        \item license/royalties: \important{free \& unlimited} vs \$\$\$
-        \item ecosystems growing rapidly (open \& proprietary cores)
-    \end{itemize}
-\end{corollary}
 
 \raggedcolumns

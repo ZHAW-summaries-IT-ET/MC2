@@ -104,7 +104,7 @@ img[10:40, 10:50] = roi          # paste it elsewhere
 
 \subsection{Convolution}
 
-%% >>> IMAGE (slide 32 / 35): kernel sliding over the image; border padding (3x3 kernel -> 1 line of padding) <<<
+IMAGE (slide 32 / 35): kernel sliding over the image; border padding (3x3 kernel -> 1 line of padding) <<<
 
 \begin{concept}{Convolution}
     \important{Element-wise multiply two matrices, then sum.} A small \important{kernel}
@@ -165,9 +165,12 @@ gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)   # also BGR2RGB, BGR2YUV
 \end{lstlisting}
 \end{KR}
 
+\raggedcolumns
+    \columnbreak
+
 \subsection{Object Detection (Haar Cascades)}
 
-%% >>> IMAGE (slide 47): Haar-like features (edge, line, four-rectangle) <<<
+IMAGE (slide 47): Haar-like features (edge, line, four-rectangle) <<<
 
 \begin{concept}{Haar Cascade Classifiers}
     Object-detection using a \important{pretrained classifier in an XML file}.

@@ -54,7 +54,7 @@
 
 \subsection{Kernel Architecture}
 
-%% >>> IMAGE (slide 8): kernel architecture -- apps / system libs (libc) / syscall + sysfs interface / kernel (scheduler, MM, IPC, FS, networking, drivers, modules) / arch-dependent code / hardware <<<
+IMAGE (slide 8): kernel architecture -- apps / system libs (libc) / syscall + sysfs interface / kernel (scheduler, MM, IPC, FS, networking, drivers, modules) / arch-dependent code / hardware <<<
 
 \mult{2}
 
@@ -218,7 +218,7 @@ console=ttyS0 root=/dev/mmcblk0p2 rootwait
 
 \subsection{System Calls}
 
-%% >>> IMAGE (slide 34): ARM ISR/exception vector table (Reset, NMI, HardFault, SVC #11 at 0x2C, SysTick, IRQ0..239) <<<
+IMAGE (slide 34): ARM ISR/exception vector table <<<
 
 \begin{concept}{System Calls}
     The main interface between \important{user space} and the \important{kernel}
@@ -280,9 +280,13 @@ svc #0
     crashes} the system.
 \end{remark2}
 
+\raggedcolumns
+\columnbreak
+
+
 \subsection{eBPF (extended Berkeley Packet Filter)}
 
-%% >>> IMAGE (slide 41): eBPF flow -- BPF program -> LLVM/Clang -> bytecode -> eBPF verifier + JIT -> kernel; BPF maps shared with user space <<<
+IMAGE (slide 41): eBPF flow -- BPF program -> LLVM/Clang -> bytecode -> eBPF verifier + JIT -> kernel; BPF maps shared with user space <<<
 
 \begin{concept}{eBPF}
     Runs \important{sandboxed} programs in kernel space \important{without} kernel
