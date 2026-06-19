@@ -1,0 +1,423 @@
+\section{03 Linux GPIO}
+
+\subsection{GPIO Registers (BCM2711)}
+
+%% >>> IMAGE (slide 3): RPi4 40-pin header pinout <<<
+%% >>> IMAGE (slide 6): BCM2711 block diagram (ARM physical 0x0FE200000 vs legacy 0x7E200000, AXI bridge) <<<
+
+\begin{concept}{GPIO \& its Registers}
+    The BCM2711 provides \important{58 GPIOs}. Each pin can be GPIO or an
+    \important{alternate function} (UART, I2C, SPI, \dots). Controlled via register banks:
+    \begin{itemize}
+        \item \important{GPFSEL} -- function select \emph{and} direction (in/out/alt)
+        \item \important{GPSET} -- set output high, \important{GPCLR} -- set output low
+        \item \important{GPLEV} -- read input level (high/low)
+    \end{itemize}
+\end{concept}
+
+\begin{definition}{GPFSEL -- Function Select}
+    3 bits per pin, \important{10 GPIOs per 32-bit register} (GPFSEL0\dots5).
+    \begin{itemize}
+        \item \texttt{000} input, \texttt{001} output
+        \item \texttt{100/101/110/111} alt fn 0--3, \texttt{011/010} alt fn 4--5
+    \end{itemize}
+    LSB of a pin's field:
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+#define FSELX_OFFSET(pin) (pin % 10 * 3)  // 3 bits per GPIO
+\end{lstlisting}
+\end{definition}
+
+\mult{2}
+
+\begin{definition}{SET / CLR / LEV}
+    Each is a bitfield, 1 bit per GPIO (banks 0 \& 1 cover 0--57):
+    \begin{itemize}
+        \item write 1 to \texttt{GPSETn} bit $\to$ pin high
+        \item write 1 to \texttt{GPCLRn} bit $\to$ pin low
+        \item read \texttt{GPLEVn} bit $\to$ current input level
+    \end{itemize}
+\end{definition}
+
+\begin{formula}{Register Offsets (base 0x7e200000)}
+    \begin{tabular}{l|l}
+        \texttt{0x00..0x14} & GPFSEL0\dots5 \\
+        \texttt{0x1c / 0x20} & GPSET0 / GPSET1 \\
+        \texttt{0x28 / 0x2c} & GPCLR0 / GPCLR1 \\
+        \texttt{0x34 / 0x38} & GPLEV0 / GPLEV1 \\
+    \end{tabular}
+    All accesses are 32-bit.
+\end{formula}
+
+\multend
+
+\subsection{GPIO Access Methods}
+
+\begin{concept}{Two Ways to Reach the GPIO Registers}
+    \begin{itemize}
+        \item \important{Method 1 -- Pseudo filesystem} (\texttt{/sys/class/gpio}):
+              needs a GPIO driver, \important{portable}, less hassle with addresses,
+              but \emph{slow}
+        \item \important{Method 2 -- Memory mapped} (\texttt{/dev/mem} + \texttt{mmap}):
+              direct pointer access to peripheral addresses, need the exact address,
+              but \important{much faster}
+    \end{itemize}
+\end{concept}
+
+\begin{example2}{Exam Matching: GPIO access methods (slide 14)}
+    Match each description (left) to the right term:
+    \begin{enumerate}
+        \item Page-Offset
+        \item Translates a physical address into a virtual one
+        \item Where the physical address of the GPIO register is declared
+        \item LED toggled via file manipulation under \texttt{/dev/mem}
+        \item LED toggled via file manipulation under \texttt{/sys/class/gpio}
+    \end{enumerate}
+    Terms: \emph{size of the virtual MMU page} $\cdot$ \texttt{mmap(...)} $\cdot$
+    Device Tree $\cdot$ Memory-Map manipulation $\cdot$ Pseudo-FS manipulation
+    \tcblower
+    \important{Matches:}
+    \begin{enumerate}
+        \item $\to$ size of the virtual MMU page
+        \item $\to$ \texttt{mmap(...)}
+        \item $\to$ Device Tree
+        \item $\to$ GPIO manipulation via \important{Memory Map}
+        \item $\to$ GPIO manipulation via \important{Pseudo File System}
+    \end{enumerate}
+\end{example2}
+
+\subsection{Method 1: Pseudo Filesystem (sysfs)}
+
+\begin{definition}{sysfs GPIO File Structure}
+    Kernel config: \emph{Device drivers $\to$ GPIO Support $\to$ sysfs interface}.
+    \begin{itemize}
+        \item \texttt{/sys/class/gpio/export}, \texttt{.../unexport} -- (de)activate a GPIO
+        \item \texttt{.../gpioXX/direction} -- \texttt{"in"} or \texttt{"out"}
+        \item \texttt{.../gpioXX/value} -- \texttt{"1"} or \texttt{"0"}
+        \item \texttt{.../gpioXX/edge} -- \texttt{none}/\texttt{rising}/\texttt{falling}/\texttt{both}
+    \end{itemize}
+\end{definition}
+
+\begin{corollary}{Mind the GPIO Offset! (slide 18--19)}
+    On the InES RPi-Hat: LED4=GPIO12, LED5=GPIO13, Key0=GPIO22, Key1=GPIO23.
+    But sysfs adds a \important{base offset of 512} (\texttt{gpiochip512},
+    label \texttt{pinctrl-bcm2711}). So in sysfs:
+    \important{sysfs\_number = 512 + pin} (e.g. GPIO12 $\to$ 524, GPIO22 $\to$ 534).
+\end{corollary}
+
+\begin{KR}{Control a GPIO via sysfs}
+    \textbf{LED (output), pin 12 $\to$ 524:}
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+echo 524 > /sys/class/gpio/export
+echo out > /sys/class/gpio/gpio524/direction
+echo 1   > /sys/class/gpio/gpio524/value   # on
+echo 0   > /sys/class/gpio/gpio524/value   # off
+echo 524 > /sys/class/gpio/unexport        # free
+\end{lstlisting}
+    \textbf{Button (input), pin 22 $\to$ 534:}
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+echo 534 > /sys/class/gpio/export
+echo in  > /sys/class/gpio/gpio534/direction
+cat /sys/class/gpio/gpio534/value          # read
+echo 534 > /sys/class/gpio/unexport
+\end{lstlisting}
+    \paragraph{conclusion}
+    Always add the \important{+512 offset} when converting a board GPIO number.
+\end{KR}
+
+\begin{examplecode}{sysfs GPIO from C (slides 23--25)}
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+// export a gpio
+FILE *fp = fopen("/sys/class/gpio/export", "w");
+fprintf(fp, "%i", gpio); fflush(fp); fclose(fp);
+
+// set value
+void fs_gpio_set(int gpio, int val) {
+char str[100];
+sprintf(str, "/sys/class/gpio/gpio%i/value", gpio);
+FILE *fp = fopen(str, "w");
+fprintf(fp, "%i", val); fflush(fp); fclose(fp);
+}
+// read value
+int fs_gpio_get(int gpio) {
+char str[100]; int ret;
+sprintf(str, "/sys/class/gpio/gpio%i/value", gpio);
+FILE *fp = fopen(str, "r");
+fread(str, 101, 1, fp);
+sscanf(str, "%i", &ret); fclose(fp);
+return ret;
+}
+\end{lstlisting}
+\end{examplecode}
+
+\subsection{Method 2: Memory-Mapped GPIO}
+
+%% >>> IMAGE (slide 29 / 33): virtual vs physical address space, mmap() maps GPIO_BASE_ADDR (page-aligned) to virtual_gpio_base; legacy bridge 35-bit <-> 32-bit <<<
+
+\begin{concept}{MMU \& mmap}
+    The CPU sees \important{virtual} addresses; hardware lives at \important{physical}
+    addresses. \texttt{/dev/mem} exposes physical memory; \texttt{mmap()} returns a
+    \important{virtual} pointer to the (page-aligned) GPIO base. The program then
+    works purely with virtual addresses; the MMU translates them.
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+void *mmap(addr, len, prot, flags, fd, base_addr);
+\end{lstlisting}
+\end{concept}
+
+\begin{corollary}{Legacy Bridging}
+    The BCM2711 uses \important{35} address lines, but older peripherals still use
+    the legacy \important{32}-bit map. A hardware \important{bridge} adapts new$\to$old
+    addresses; a \texttt{ranges} section in the \emph{device tree} tells Linux about
+    the mapping (e.g. ARM \texttt{0xFE200000} $\leftrightarrow$ legacy \texttt{0x7E200000}).
+\end{corollary}
+
+\begin{KR}{Memory-Mapped GPIO Access}
+    \textbf{Step 1 -- map the base} (open \texttt{/dev/mem}, \texttt{mmap} one page):
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+void *virtual_gpio_base;             // global pointer
+int mmap_virtual_base() {
+int m_mfd;
+if ((m_mfd = open("/dev/mem", O_RDWR)) < 0)
+return m_mfd;                      // FAIL
+virtual_gpio_base = mmap(NULL, sysconf(_SC_PAGE_SIZE),
+PROT_READ|PROT_WRITE, MAP_SHARED, m_mfd, GPIO_BASE_ADDR);
+close(m_mfd);
+if (virtual_gpio_base == MAP_FAILED) return errno;
+return 0;
+}
+\end{lstlisting}
+    \textbf{Step 2 -- set/clear} a pin (write the bit into SET0/CLR0):
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+#define GPIO_SET0 0x1c
+#define GPIO_CLR0 0x28
+void mmap_gpio_set(int gpio, int value) {
+uint32_t *reg = value
+? (uint32_t*)(virtual_gpio_base + GPIO_SET0)
+: (uint32_t*)(virtual_gpio_base + GPIO_CLR0);
+*reg = (0x1 << gpio);
+}
+\end{lstlisting}
+    \textbf{Step 3 -- set direction} (read-modify-write the FSEL field):
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+#define GPIO_FSEL1 0x04
+#define GPIO_FSEL2 0x08
+void mmap_gpio_direction(int gpio, int dir) {
+uint32_t *reg;
+if (gpio <= 9)        reg = (uint32_t*) virtual_gpio_base;
+else if (gpio < 20)   reg = (uint32_t*)(virtual_gpio_base + GPIO_FSEL1);
+else                  reg = (uint32_t*)(virtual_gpio_base + GPIO_FSEL2);
+*reg &= ~(0x7 << FSELX_OFFSET(gpio));   // clear field
+*reg |=  (dir << FSELX_OFFSET(gpio));   // set direction
+}
+\end{lstlisting}
+\end{KR}
+
+\subsection{Device Tree}
+
+\begin{concept}{Device Tree -- Purpose}
+    A data structure describing the \important{hardware} to Linux (especially
+    \important{non-discoverable} hardware). Tells the kernel:
+    \begin{itemize}
+        \item physical addresses \& sizes of memory/peripheral registers
+        \item where interrupts and GPIO/peripheral pins are connected
+        \item which alternate functions and \important{which driver} to load (+ enable it)
+    \end{itemize}
+\end{concept}
+
+\mult{2}
+
+\begin{definition}{Principle \& Files}
+    Non-discoverable HW is either coded in C in the kernel \emph{or} described in a
+    device tree:
+    \begin{itemize}
+        \item \texttt{.dts} -- device tree \important{source}
+        \item \texttt{.dtb} -- compiled \important{blob} used by the kernel
+        \item \texttt{dtc} -- device tree compiler
+    \end{itemize}
+    The bootloader loads \important{both} kernel image and \texttt{.dtb} before starting.
+\end{definition}
+
+\begin{definition}{Mechanism}
+    \begin{enumerate}
+        \item Device tree is \important{parsed}
+        \item a \important{compatible} driver in the kernel is searched \& started
+        \item the driver gets additional \important{properties} from the device tree
+    \end{enumerate}
+\end{definition}
+
+\multend
+
+\begin{definition}{Structure}
+    Tree of \texttt{node@unit-address \{ property = value; \dots \}}; nodes can hold
+    child nodes; a \important{phandle} (\texttt{<\&label>}) references another node.
+    Values: strings, \texttt{<cells>} (32-bit), or \texttt{[bytes]}.
+\end{definition}
+
+\begin{example2}{Exam Quiz: Device Tree (slide 42)}
+    \textbf{Q1 -- What is a device tree?}
+    \begin{enumerate}
+        \item Definition of the processor architecture
+        \item Data structure about hardware properties
+        \item File structure of the filesystem (tree)
+        \item Holds info about hardware that can't be auto-detected
+    \end{enumerate}
+    \textbf{Q2 -- What applies to the term device tree?}
+    \begin{enumerate}
+        \item The same compiled kernel can support different HW configurations
+        \item Holds the virtual addresses of the machine hardware
+        \item Holds the device drivers of the machine hardware
+        \item Holds a list \& addresses of "non-discoverable" hardware
+    \end{enumerate}
+    \tcblower
+    \important{Q1: (2) and (4).} (1) wrong scope, (3) confuses it with the filesystem.
+
+    \important{Q2: (1) and (4).} (2) false -- it holds \emph{physical} addresses;
+    (3) false -- it \emph{references} which driver, it doesn't contain drivers.
+\end{example2}
+
+\begin{examplecode}{GPIO node in bcm2711-rpi-4b.dts (slide 47)}
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+gpio0: gpio@0x7e200000 {
+compatible = "brcm,bcm2711-gpio";  // -> find driver
+reg = <0x7e200000 0xb4>;           // base addr, size
+interrupts = <0x00 0x71 0x04 ...>;
+gpio-controller; #gpio-cells = <2>;
+interrupt-controller;
+pinctrl-names = "default";
+phandle = <0x0f>;
+i2c1_gpio2 { brcm,pins = <0x02 0x03>;  // GPIO 2 & 3
+brcm,function = <0x04>; };            // alt fn 0 = I2C
+};
+\end{lstlisting}
+\end{examplecode}
+
+\begin{example2}{Exam Exercise: Read a Device Tree Node (slide 49)}
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+i2c@7e804000 {
+compatible = "brcm,bcm2711-i2c\0brcm,bcm2835-i2c";
+reg = <0x7e804000 0x1000>;
+interrupts = <0x00 0x75 0x04>;
+status = "okay";
+clock-frequency = <0x186a0>;
+};
+\end{lstlisting}
+    \tcblower
+    \begin{itemize}
+        \item Device? \important{I2C}
+        \item Address? \texttt{0x7e804000} -- \important{legacy} view (\texttt{0x7e\dots})
+        \item Size? \texttt{0x1000} bytes
+        \item Compatible driver? \texttt{brcm,bcm2711-i2c} (the \texttt{\textbackslash0}
+              separates a 2nd fallback driver \texttt{bcm2835-i2c})
+        \item Driver enabled? \important{yes} (\texttt{status = "okay"}; \texttt{"disabled"}
+              $\to$ not loaded at boot)
+    \end{itemize}
+\end{example2}
+
+\begin{KR}{Reading a Device Tree Node}
+    \begin{itemize}
+        \item node name before \texttt{@} = \important{device}; after \texttt{@} = address
+        \item \texttt{reg = <addr size>} $\to$ register base + length
+        \item address \texttt{0x7e\dots} = legacy view, \texttt{0xfe\dots} = ARM view
+        \item \texttt{compatible} = driver name(s); \texttt{\textbackslash0} separates fallbacks
+        \item \texttt{status = "okay"} loaded, \texttt{"disabled"} not loaded
+    \end{itemize}
+\end{KR}
+
+\subsection{I2C Bus}
+
+%% >>> IMAGE (slide 51): I2C read/write cycle timing (S, slave addr, R/W, A, DATA, P) <<<
+
+\mult{2}
+
+\begin{concept}{I2C Protocol}
+    \begin{itemize}
+        \item \important{7-bit} slave address + $R/\overline{W}$ bit, then \important{8-bit}
+              data bytes
+        \item each byte \important{ACK}'d (SDA low = ACK, high = NACK)
+        \item \important{S} = start condition, \important{P} = stop condition
+    \end{itemize}
+\end{concept}
+
+\begin{definition}{MCP23008 I2C Expander}
+    Key registers:
+    \begin{itemize}
+        \item \texttt{IODIR (0x00)} -- 0 = output, 1 = input
+        \item \texttt{GPIO (0x09)} -- read pin levels / write outputs
+        \item \texttt{OLAT (0x0A)} -- output latch
+        \item \texttt{GPPU (0x06)} -- pull-ups
+    \end{itemize}
+    sysfs maps its GPIOs as \important{GPIO578\dots585}.
+\end{definition}
+
+\multend
+
+\begin{KR}{Inspect \& Drive I2C with i2c-tools}
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+lsmod                       # list active drivers
+rmmod pinctrl_mcp23s08_i2c  # free bus if a driver holds it
+i2cdetect -l                # list buses (e.g. i2c-1)
+i2cdetect -y 1              # scan bus 1 (UU=busy, 20=device@0x20)
+i2cdump  -y 1 0x20          # dump all regs of device 0x20
+i2cset   -y 1 0x20 0x0 0xf0 # write reg 0x00 = 0xf0 (IODIR)
+i2cset   -y 1 0x20 0xa 0x0f # write reg 0x0a = 0x0f (OLAT)
+\end{lstlisting}
+    Syntax: \texttt{i2cset [-y] bus chip-addr data-addr [value]}.
+\end{KR}
+
+\subsection{I2C-dev (C API)}
+
+%% >>> IMAGE (slide 69): write vs read sequence to MCP23008 (write reg addr, then read data) <<<
+
+\begin{KR}{Access an I2C Device via i2c-dev}
+    \textbf{Step 1 -- open the bus} and select the slave:
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+#include <linux/i2c-dev.h>
+#include <sys/ioctl.h>
+int fd = open("/dev/i2c-1", O_RDWR);     // bus file
+if (fd < 0) { perror("open i2c"); exit(1); }
+int addr = 0x20;
+if (ioctl(fd, I2C_SLAVE, addr) < 0)      // pick slave addr
+{ printf("no slave\n"); exit(1); }
+\end{lstlisting}
+    \textbf{Step 2 -- write} (register address + data):
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+uint8_t wr_buf[2] = { reg_addr, reg_data };
+if (write(fd, wr_buf, 2) != 2) printf("write failed\n");
+\end{lstlisting}
+    \textbf{Step 3 -- read} (write the reg address, then read the data byte):
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+uint8_t wr_buf[1] = { reg_addr }, rd_buf[1];
+write(fd, wr_buf, 1);                    // point to register
+if (read(fd, rd_buf, 1) == 1) data = rd_buf[0];
+\end{lstlisting}
+    \important{Note:} the bus cannot be opened if another driver already occupies it.
+\end{KR}
+
+\begin{remark}
+    \important{Lab 3--4 goal:} test file-based GPIO and include it in the CLI,
+    program memory-mapped GPIO with \texttt{mmap()}, and access the MCP23008 I2C
+    expander both with i2c-tools and with i2c-dev.
+\end{remark}
+
+\subsection{Exam Exercise (Probepr\"ufung 2021)}
+
+\begin{example2}{Exam 2021 A3: GPIO access}
+    A device-tree GPIO node is given; access the GPIOs.
+    \tcblower
+    \begin{itemize}
+        \item \important{a)} driver name: \texttt{brcm,bcm2711-gpio}
+        \item \important{b)} register block size: \texttt{0xb4} bytes
+        \item \important{c)} find the gpiochip nr: \texttt{ls gpiochip*/device/driver}
+        \item \important{d)} LED at GPIO19 = sysfs nr \important{340}:\\
+              \texttt{echo 340 > /sys/class/gpio/export}\\
+              \texttt{echo out > /sys/class/gpio/gpio340/direction}\\
+              \texttt{echo 1 > /sys/class/gpio/gpio340/value}
+        \item \important{e)} GPIO base addr: Legacy \texttt{0x7e200000},
+              ARM-View \texttt{0xfe200000}
+        \item \important{f)} \texttt{\#define GPIO\_BASE\_ADDR 0xfe200000}
+        \item \important{g)} \texttt{gpio\_reg} (level reg, offset \texttt{0x34}) with
+              \texttt{virtual\_gpio\_base = 0x84ec0000} $\to$
+              \important{\texttt{0x84ec0034}}
+    \end{itemize}
+\end{example2}
+
+\raggedcolumns

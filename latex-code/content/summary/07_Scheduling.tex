@@ -1,0 +1,348 @@
+\section{07 Scheduling}
+
+\subsection{Processes \& Threads}
+
+\mult{2}
+
+\begin{concept}{Process vs. Thread}
+    \begin{itemize}
+        \item \important{Process}: a program in execution with its \important{own
+              protected} address space (code/data/stack segments); one CPU runs one
+              process at a time (context switching fakes concurrency); IPC is complicated
+        \item \important{Thread}: "little sister" of a process; $\geq$1 per process,
+              \important{shares} the process memory but has its own stack + registers
+        \item Inter-thread comm is simpler (shared memory) but \important{no} memory
+              protection between threads
+    \end{itemize}
+\end{concept}
+
+\begin{definition}{Task States}
+    \begin{itemize}
+        \item \important{Created} $\to$ admitted $\to$ \important{Ready}
+        \item \important{Running}: executing on the CPU
+        \item \important{Blocked}: waiting on a blocking condition
+        \item \important{Preempted}: a higher-priority task interrupts $\to$ back to Ready
+        \item \important{Terminated}: set inactive
+    \end{itemize}
+    Transitions: scheduler \emph{dispatches} Ready$\to$Running; block/wait
+    Running$\to$Blocked; preempt Running$\to$Ready.
+\end{definition}
+
+\multend
+
+\subsection{Linux Scheduling Policies}
+
+\begin{definition}{Scheduling Policies}
+    \begin{center}
+    \begin{tabular}{l|l|c}
+        Algorithm & Policy & RT \\\hline
+        Completely Fair Sched. & \texttt{SCHED\_OTHER} & no \\
+        First come first served & \texttt{SCHED\_FIFO} & \important{yes} \\
+        Round Robin & \texttt{SCHED\_RR} & \important{yes} \\
+        Batch & \texttt{SCHED\_BATCH} & no \\
+        Run when nothing else & \texttt{SCHED\_IDLE} & no \\
+    \end{tabular}
+    \end{center}
+\end{definition}
+
+\mult{2}
+
+\begin{concept}{Completely Fair Scheduler (CFS)}
+    Standard Linux scheduler (\texttt{SCHED\_OTHER}) since kernel 2.6.23.
+    \begin{itemize}
+        \item distributes weighted runtime evenly; \important{vruntime} = runtime
+              weighted by priority
+        \item red-black tree sorted by vruntime; \important{leftmost} (least CPU) runs next
+        \item timeslices typ. 4--24 ms; \important{not} for real-time (unpredictable)
+    \end{itemize}
+\end{concept}
+
+\begin{definition}{Good vs. Bad Delay}
+    \begin{itemize}
+        \item \important{Bad}: busy-wait \texttt{for(...)\{\}} -- task stays
+              \emph{running}, hogs the CPU
+        \item \important{Good}: \texttt{usleep(...)} -- task is \emph{blocked}, other
+              tasks may use the CPU
+    \end{itemize}
+\end{definition}
+
+\multend
+
+\subsection{Real-Time Schedulers: FIFO \& RR}
+
+\mult{2}
+
+\begin{definition}{SCHED\_FIFO}
+    \begin{itemize}
+        \item same priority: first task in the ready queue runs until it
+              \important{completes or blocks} (no timeslice)
+        \item different priority: a higher-priority task \important{preempts} a lower one
+    \end{itemize}
+\end{definition}
+
+\begin{definition}{SCHED\_RR}
+    Like FIFO but each task has a fixed \important{timeslice}
+    (\texttt{sched\_rr\_timeslice\_ms}).
+    \begin{itemize}
+        \item runs for its slice \emph{or} until blocked, then is preempted and
+              re-queued (same priority)
+        \item higher priority still preempts immediately
+    \end{itemize}
+\end{definition}
+
+\multend
+
+\begin{example2}{Exam Quiz: Which apply to Round Robin? (slide 22)}
+    Select one or more:
+    \begin{enumerate}
+        \item An RR task can't be interrupted until its slice expires
+        \item A low-prio task can interrupt a higher-prio task if no low-prio task
+              ran for a long time
+        \item Two low-prio tasks (e.g. both 20) alternate while higher-prio tasks
+              (e.g. 40) are blocked
+        \item A higher-prio task can only preempt a lower one after an RR slice expires
+        \item All RR tasks have a slice; when it expires the task is interrupted by
+              another \emph{same-priority} task
+        \item If a task blocks, a ready \emph{same-priority} task follows
+    \end{enumerate}
+    \tcblower
+    \important{Correct: (3), (5), (6).}
+    (1),(4) false -- a higher-priority task preempts \emph{immediately}; (2) false --
+    RR has no priority aging/boost.
+\end{example2}
+
+\mult{2}
+
+\begin{formula}{RR Response Time \& Slice Choice}
+    \begin{itemize}
+        \item active time $<$ slice $\Rightarrow$ \important{Response = Active Time}
+        \item active time $>$ slice $\Rightarrow$ \important{Response = Active Time +
+              Time Slice}
+    \end{itemize}
+    Slice too \important{small} $\to$ admin overhead dominates; too \important{large}
+    $\to$ time-critical tasks locked out. \important{Optimal}: slightly $>$ average
+    task activity.
+\end{formula}
+
+\begin{KR}{Get/Set the RR Timeslice}
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+cat /proc/sys/kernel/sched_rr_timeslice_ms      # read (default 100 ms)
+echo '100' > /proc/sys/kernel/sched_rr_timeslice_ms  # set
+\end{lstlisting}
+\end{KR}
+
+\multend
+
+\begin{example2}{Exam Exercise: Scheduling Order (slide 11)}
+    3 tasks on a 1-core CPU; each function: \texttt{usleep} (0.8 / 1.2 / 2.0 s) $\to$
+    LED\important{0/1/2} ON $\to$ \textasciitilde3 s busy-loop $\to$ LED OFF. The
+    number in the order = which LED toggles.
+    \tcblower
+    \begin{itemize}
+        \item \important{Option 1 -- all \texttt{SCHED\_OTHER}} (prio 40/30/20):
+              CFS interleaves fairly $\to$ \texttt{0 1 2 0 1 2}
+        \item \important{Option 2 -- all \texttt{SCHED\_FIFO}}, prio f1\,40 $>$ f2\,30
+              $>$ f3\,20: each runs to completion in priority order $\to$
+              \texttt{0 0 1 1 2 2}
+        \item \important{Option 3 -- all \texttt{SCHED\_FIFO}}, prio f1\,20 $<$ f2\,30
+              $<$ f3\,40: each new (higher) task preempts; they finish LIFO $\to$
+              \texttt{0 1 2 2 1 0}
+    \end{itemize}
+\end{example2}
+
+\subsection{Priority Ranges}
+
+\mult{2}
+
+\begin{definition}{Nice \& RT Priorities}
+    \begin{itemize}
+        \item \important{Nice} (SCHED\_OTHER): $-20$ (highest) \dots $+19$ (lowest)
+        \item \important{RT priority} (FIFO/RR): \important{1} (lowest) \dots
+              \important{99} (highest)
+        \item \texttt{top} columns: \texttt{PR} (priority), \texttt{NI} (nice);
+              RT shown as \texttt{PR = rt} or negative
+    \end{itemize}
+\end{definition}
+
+\begin{corollary}{C-Program RT Value Offset}
+    A real-time priority set in a C program is interpreted \important{+1} by the
+    scheduler -- e.g. setting \texttt{49} $\to$ scheduler uses \texttt{50}.
+\end{corollary}
+
+\multend
+
+\begin{formula}{RT Bandwidth Throttling}
+    \begin{itemize}
+        \item \texttt{sched\_rt\_period\_us} = 1\,000\,000 (100\% CPU, default)
+        \item \texttt{sched\_rt\_runtime\_us} = 950\,000 (95\% for RT, default)
+    \end{itemize}
+    $\Rightarrow$ \important{5\% of CPU is reserved} for non-RT (OTHER) tasks so RT
+    tasks can't starve the system.
+\end{formula}
+
+\begin{definition}{Command "top"}
+    Process status (\texttt{S}): \texttt{R} running, \texttt{S} sleeping, \texttt{D}
+    uninterruptible sleep, \texttt{I} idle, \texttt{T} stopped, \texttt{Z} zombie.
+    Columns: \texttt{PR}/\texttt{NI} (prio/nice), \texttt{VIRT}/\texttt{RES}/\texttt{SHR}
+    (memory), \texttt{\%CPU}, \texttt{\%MEM}, \texttt{TIME+}, \texttt{COMMAND}.
+    (\texttt{top -H} for threads not on BusyBox target.)
+\end{definition}
+
+\subsection{POSIX Threads}
+
+\begin{KR}{Create \& Join Threads}
+    \textbf{Create} -- \texttt{pthread\_create(\&tid, attr, start\_routine, arg)}:
+    \texttt{attr}=NULL for defaults, returns 0 on success.
+    \textbf{Join} -- \texttt{pthread\_join(tid, \&ret)}: parent waits for the child
+    (avoids \important{zombies}).
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+#include <pthread.h>
+void *print_msg(void *ptr) { printf("%s\n", (char*)ptr); return NULL; }
+int main(void) {
+pthread_t t1, t2;
+const char *m1 = "Hello 1", *m2 = "Hello 2";
+pthread_create(&t1, NULL, &print_msg, (void*)m1);
+pthread_create(&t2, NULL, &print_msg, (void*)m2);
+pthread_join(t1, NULL);
+pthread_join(t2, NULL);
+}
+\end{lstlisting}
+    Compile: \texttt{gcc -o foo foo.c -lpthread}. Also: \texttt{pthread\_exit},
+    \texttt{pthread\_self}, \texttt{pthread\_equal}, \texttt{pthread\_detach}
+    (no join needed).
+\end{KR}
+
+\begin{KR}{Set Scheduler Policy/Priority in a Thread}
+    \texttt{sched\_setscheduler(pid, policy, \&param)}: \texttt{pid=0} = calling thread.
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+#include <sched.h>
+struct sched_param p;
+p.sched_priority = 30;
+sched_setscheduler(0, SCHED_FIFO, &p);   // policy + priority
+\end{lstlisting}
+    \texttt{policy} $\in$ \{OTHER, RR, FIFO, BATCH, IDLE\}.
+\end{KR}
+
+\subsection{Synchronization}
+
+\begin{example2}{Exam Exercise: Why Synchronize? (slide 47)}
+    \texttt{Task1}: \texttt{data = data*2} (T1.1); \texttt{print} (T1.2).
+    \texttt{Task2}: \texttt{data = data/2} (T2.1); \texttt{print} (T2.2).
+    Initial \texttt{data = 20}. What is printed? (data value $\to$ printed value)
+    \tcblower
+    \begin{itemize}
+        \item T1.1$\to$40, T1.2$\to$\important{40}, T2.1$\to$20, T2.2$\to$\important{20}
+        \item T1.1$\to$40, T2.1$\to$20, T1.2$\to$\important{20}, T2.2$\to$\important{20}
+        \item T2.1$\to$10, T2.2$\to$\important{10}, T1.1$\to$20, T1.2$\to$\important{20}
+        \item T2.1$\to$10, T1.1$\to$20, T2.2$\to$\important{20}, T1.2$\to$\important{20}
+    \end{itemize}
+    Different interleavings give different output $\to$ \important{race condition}
+    $\to$ need synchronization.
+\end{example2}
+
+\begin{KR}{Mutex (Mutual Exclusion)}
+    Protect a critical section so only one thread enters at a time:
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_lock(&m);     // enter critical section
+// ... shared data ...
+pthread_mutex_unlock(&m);   // leave
+sched_yield();              // relinquish CPU (-> end of prio queue)
+\end{lstlisting}
+\end{KR}
+
+\begin{KR}{Condition Variables}
+    For \important{waiting/signalling}; always paired with a locked mutex.
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+pthread_cond_t c = PTHREAD_COND_INITIALIZER;
+pthread_mutex_lock(&m);
+pthread_cond_wait(&c, &m);    // RELEASES m while waiting, re-locks on wake
+pthread_mutex_unlock(&m);
+// other thread:
+pthread_cond_signal(&c);      // wake ONE waiter
+pthread_cond_broadcast(&c);   // wake ALL waiters
+\end{lstlisting}
+    \important{No deadlock} even if the signaller also locks \texttt{m}: \texttt{cond\_wait}
+    frees the mutex while blocked.
+\end{KR}
+
+\begin{corollary}{Deadlock \& Priority Inversion}
+    \begin{itemize}
+        \item \important{Deadlock}: A locks File1 and waits on File2, B locks File2
+              and waits on File1 $\to$ stuck forever
+        \item \important{Priority inversion}: a low-prio task holds a lock a high-prio
+              task needs, so the high-prio task waits behind it
+    \end{itemize}
+\end{corollary}
+
+\begin{KR}{Semaphores (Token Basket)}
+    \texttt{sem\_post} adds a token, \texttt{sem\_wait} takes one (blocks if empty).
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+#include <semaphore.h>
+sem_t s;
+sem_init(&s, 0, 1);   // pshared=0, initial tokens=1
+sem_wait(&s);         // take a token (block if none)
+// ... critical work ...
+sem_post(&s);         // return a token (wakes a waiter)
+\end{lstlisting}
+    Also: \texttt{sem\_getvalue}, \texttt{sem\_destroy}.
+\end{KR}
+
+\mult{2}
+
+\begin{example2}{Multiplex with Semaphores (slide 62)}
+    Two threads each blink an LED, guarded by one semaphore. Behaviour by initial
+    token count:
+    \tcblower
+    \begin{itemize}
+        \item \important{1 token}: mutual exclusion -- only one thread in the section
+              at a time (alternating)
+        \item \important{0 tokens}: nobody can enter -- both block forever
+        \item \important{2 tokens}: \emph{both} threads run concurrently (no exclusion)
+    \end{itemize}
+\end{example2}
+
+\begin{example2}{Rendezvous with Semaphores (slide 65)}
+    Two semaphores \important{both initialised with 0 tokens}; each thread posts the
+    other's semaphore and waits on its own.
+    \tcblower
+    Forces the two threads to \important{meet at a sync point} before continuing --
+    neither proceeds past the rendezvous until both have arrived. (Which LED turns
+    off first depends on the post/wait order $\to$ test in the lab.)
+\end{example2}
+
+\multend
+
+\subsection{Exam Exercises (Probepr\"ufung 2021)}
+
+\begin{example2}{Exam 2021 A4: Threads + mutex/cond}
+    3 threads; each: lock mutex, \texttt{c = a++} (\texttt{a} starts at 5),
+    \texttt{param.sched\_priority = c}, \texttt{SCHED\_FIFO}, then \texttt{cond\_wait}.
+    \texttt{main} \texttt{usleep}s, then \texttt{cond\_broadcast}.
+    \tcblower
+    \begin{itemize}
+        \item \important{a)} \important{3} threads started
+        \item \important{b)} priorities \important{5, 6, 7} (the one with 7 is highest)
+        \item \important{c)} \texttt{SCHED\_FIFO} = \important{preemptive} scheduling
+        \item \important{d)} \texttt{cond\_broadcast} signals \emph{all} threads to continue
+        \item \important{e)} \important{No} -- only \texttt{tid[0]} is joined; fix: loop
+              \texttt{pthread\_join(tid[i])} for all \texttt{M}
+        \item \important{f)} output (highest prio first, \texttt{b++} post-increment):\\
+              \texttt{Output 7 : 0} / \texttt{Output 6 : 1} / \texttt{Output 5 : 2}
+    \end{itemize}
+\end{example2}
+
+\begin{example2}{Exam 2021 A5a: Scheduling policy comparison}
+    {\footnotesize\setlength{\tabcolsep}{4pt}%
+    \begin{tabular}{l|c|c|c}
+         & \texttt{OTHER} & \texttt{RR} & \texttt{FIFO} \\\hline
+        prio / nice & nice $-20$..$+19$ & prio 1..99 & prio 1..99 \\
+        best / worst & $-20$ hi / 19 lo & 99 hi / 1 lo & 99 hi / 1 lo \\
+        realtime? & no & yes & yes \\
+        preempt by & RT + slices & higher RT + slices & higher RT \\
+        round robin & variable slices & fixed slices & none \\
+        typical use & GUI & audio/video & audio/video \\
+    \end{tabular}}
+\end{example2}
+
+\raggedcolumns

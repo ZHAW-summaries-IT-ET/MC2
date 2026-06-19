@@ -1,0 +1,257 @@
+\section{12 Embedded Machine Learning}
+
+\subsection{AI / ML Foundations}
+
+\mult{2}
+
+\begin{concept}{AI $\supset$ ML $\supset$ DL $\supset$ GenAI}
+    \begin{itemize}
+        \item \important{AI}: emulate human behaviour (learn, decide, recognise)
+        \item \important{ML}: algorithms that detect patterns in data (supervised /
+              unsupervised)
+        \item \important{DL}: ML using multi-layer \important{neural networks}
+        \item \important{GenAI}: DL that \emph{generates} content (text/images/code)
+    \end{itemize}
+    ML types: \important{task-driven} (supervised, predict next value),
+    \important{data-driven} (unsupervised, find clusters), \important{reinforcement}
+    (learn from mistakes).
+\end{concept}
+
+\begin{concept}{Feed-Forward Neural Net}
+    Built from \important{neurons} in input / hidden / output layers, \important{fully
+    connected}.
+    \begin{itemize}
+        \item knowledge stored in \important{weights $w$} and \important{bias $b$}
+        \item can approximate \important{any continuous function}
+        \item non-linearity from an \important{activation function}
+    \end{itemize}
+\end{concept}
+
+\multend
+
+\begin{formula}{Neuron Output \& Parameter Count}
+    One neuron:
+    $$a = \sigma\!\left(\sum_i w_i a_i + b\right) = \sigma(w_1 a_1 + \dots + w_n a_n + b)$$
+    The bias shifts the activation threshold. MNIST net (784$\to$16$\to$16$\to$10):
+    $$\underbrace{784\cdot16 + 16\cdot16 + 16\cdot10}_{\text{weights}} +
+    \underbrace{16+16+10}_{\text{biases}} = \important{13\,002}\ \text{parameters}$$
+    \important{Learning = finding the right weights \& biases.}
+\end{formula}
+
+\subsection{Activation Functions}
+
+\begin{formula}{Activation Functions}
+    \begin{itemize}
+        \item \important{Sigmoid}: $\sigma(z)=\dfrac{1}{1+e^{-z}}$ -- "old school", not
+              for hidden layers
+        \item \important{Tanh}: $\dfrac{e^{z}-e^{-z}}{e^{z}+e^{-z}}$ -- small gradient
+        \item \important{ReLU}: $\max(0,z)$ -- near-linear, easy to optimise, default choice
+        \item \important{Leaky ReLU}: $\max(\alpha z, z)$ -- small $\alpha$ avoids ReLU's
+              zero-gradient for $z\leq0$
+        \item \important{Softmax} (output layer): values 0--1 summing to 1 $\to$
+              \important{probabilities}
+    \end{itemize}
+\end{formula}
+
+\subsection{Cost \& Training}
+
+\mult{2}
+
+\begin{concept}{Cost \& Gradient Descent}
+    \important{Cost} = how wrong the output is vs the label; \important{lower = better}.
+    Training \important{minimises} the cost by walking downhill along its gradient.
+    Risk: getting stuck in \important{local minima / saddle points}.
+\end{concept}
+
+\begin{formula}{Cost / GD / Cross-Entropy}
+    Sum of squared differences:
+    $$C = \sum_k (\text{out}_k - \text{label}_k)^2$$
+    Gradient descent step ($\alpha$ = learning rate):
+    $$x \leftarrow x - \alpha\,\nabla f(x)$$
+    Cross-entropy loss ($p$ true, $q$ predicted):
+    $$H(p,q) = -\sum_{x} p(x)\log q(x)$$
+\end{formula}
+
+\multend
+
+\mult{2}
+
+\begin{definition}{Optimizers}
+    \begin{itemize}
+        \item \important{Gradient Descent}: basic downhill step
+        \item \important{Momentum}: adds a velocity term (smooths, escapes small dips)
+        \item \important{RMSProp}: per-parameter adaptive step size
+        \item \important{Adam} (Adaptive Moment Est.): \important{RMSProp + Momentum},
+              the usual default
+    \end{itemize}
+\end{definition}
+
+\begin{definition}{Epoch / Batch / Iteration}
+    \begin{itemize}
+        \item \important{Epoch}: one full pass of the \emph{entire} dataset (fwd + back)
+        \item \important{Batch size}: training examples per batch
+        \item \important{Iterations}: batches needed for one epoch
+    \end{itemize}
+    $$\text{1 Epoch} = \text{Iterations} \times \text{Batch Size}$$
+\end{definition}
+
+\multend
+
+\subsection{Keras Workflow}
+
+\begin{definition}{Frameworks}
+    \important{Keras} -- high-level API (runs on TensorFlow, \texttt{tf.keras});
+    \important{TensorFlow} (Google) -- dataflow/symbolic math;
+    \important{PyTorch} (Meta) -- Torch-based. All written in Python.
+\end{definition}
+
+\begin{KR}{Build / Compile / Train a Model}
+\begin{lstlisting}[language=Python, style=basesmol, aboveskip=2pt, belowskip=2pt]
+from tensorflow import keras
+from tensorflow.keras import layers
+model = keras.Sequential([                       # define
+keras.Input(shape=input_shape),
+layers.Flatten(),                            # 28x28 -> 784
+layers.Dense(16, activation="relu", name="Layer1"),
+layers.Dense(16, activation="relu", name="Layer2"),
+layers.Dense(num_classes, activation="softmax"), # 10 outputs
+])
+model.summary()
+adam = keras.optimizers.Adam(learning_rate=0.005,        # compile
+beta_1=0.9, beta_2=0.999, amsgrad=False)
+model.compile(optimizer=adam,
+loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+model.fit(x_train, y_train, batch_size=50, epochs=5, verbose=1)  # train
+\end{lstlisting}
+    Other losses: \texttt{mse}, \texttt{mae}, \texttt{categorical\_crossentropy}.
+\end{KR}
+
+\begin{KR}{Load \& Preprocess MNIST}
+\begin{lstlisting}[language=Python, style=basesmol, aboveskip=2pt, belowskip=2pt]
+(x_train, y_train), (x_test, y_test) = keras.datasets.mnist.load_data()
+x_train = x_train.astype("float32") / 255    # scale pixels to [0,1]
+x_test  = x_test.astype("float32")  / 255
+x_train = np.expand_dims(x_train, -1)        # (28,28) -> (28,28,1)
+x_test  = np.expand_dims(x_test, -1)
+\end{lstlisting}
+    60\,000 training + 10\,000 test images.
+\end{KR}
+
+\subsection{Deployment (TensorFlow Lite)}
+
+\begin{KR}{Convert to TFLite \& Run Inference}
+    \textbf{Convert} (on host):
+\begin{lstlisting}[language=Python, style=basesmol, aboveskip=2pt, belowskip=2pt]
+converter = tf.lite.TFLiteConverter.from_keras_model(model)
+open("model.tflite", "wb").write(converter.convert())
+\end{lstlisting}
+    \textbf{Inference} (on target): input = 28$\times$28 floats (0..1), output = 10
+    probabilities; pick the \texttt{argmax}.
+\begin{lstlisting}[language=Python, style=basesmol, aboveskip=2pt, belowskip=2pt]
+interpreter = Interpreter("model.tflite")
+interpreter.allocate_tensors()
+in_d  = interpreter.get_input_details()[0]
+out_d = interpreter.get_output_details()[0]
+def predict(image):
+inp = np.array(image, dtype="f").reshape([1, 28, 28, 1])
+interpreter.set_tensor(in_d["index"], inp)
+interpreter.invoke()
+out = interpreter.get_tensor(out_d["index"])[0]
+return int(np.argmax(out))           # most probable digit
+\end{lstlisting}
+    In C: \texttt{TfLiteModelCreateFromFile} $\to$ \texttt{...InterpreterCreate} $\to$
+    \texttt{AllocateTensors} $\to$ copy input $\to$ \texttt{...Invoke} $\to$ read output.
+\end{KR}
+
+\subsection{Convolutional Neural Networks}
+
+%% >>> IMAGE (slide 52): CNN for MNIST -- INPUT 28x28x1 -> Conv 5x5 -> MaxPool 2x2 -> Conv 5x5 -> MaxPool 2x2 -> Flatten -> FC -> 10 outputs <<<
+
+\mult{2}
+
+\begin{concept}{CNN}
+    \begin{itemize}
+        \item \important{Convolution}: filter input with a kernel $\to$
+              \important{feature extraction} + data reduction
+        \item \important{Pooling} (sub-sampling): max- or average-pool reduces
+              dimensions \& parameters $\to$ faster training, controls
+              \important{over-fitting}
+    \end{itemize}
+\end{concept}
+
+\begin{formula}{Conv / Pool Output Sizes}
+    Valid 5$\times$5 conv: $n \to n-4$; 2$\times$2 max-pool (stride 2): $n \to n/2$.
+    \begin{itemize}
+        \item 28 $\to$ \texttt{Conv5} 24 $\to$ \texttt{Pool2} 12
+        \item 12 $\to$ \texttt{Conv5} 8 $\to$ \texttt{Pool2} 4
+        \item flatten $4\cdot4\cdot32 = 512 \to$ Dense 10
+    \end{itemize}
+\end{formula}
+
+\multend
+
+\begin{KR}{Build a CNN in Keras}
+\begin{lstlisting}[language=Python, style=basesmol, aboveskip=2pt, belowskip=2pt]
+model = keras.Sequential([
+keras.Input(shape=input_shape),
+layers.Conv2D(16, kernel_size=(5,5), activation="relu"),
+layers.MaxPooling2D(pool_size=(2,2)),
+layers.Conv2D(32, kernel_size=(5,5), activation="relu"),
+layers.MaxPooling2D(pool_size=(2,2)),
+layers.Flatten(),
+layers.Dense(num_classes, activation="softmax"),
+])
+# ~18'378 params, ~98.67% MNIST accuracy (vs dense-only net)
+\end{lstlisting}
+\end{KR}
+
+\subsection{Image Acquisition for ML (Lab 7)}
+
+\begin{KR}{Webcam $\to$ 28$\times$28 Pipeline}
+    Host trains $\to$ \texttt{model.tflite}; target grabs \& preprocesses an image:
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+gst-launch-1.0 v4l2src device=/dev/video0 \
+  ! video/x-raw,width=640,height=480 \
+  ! videorate ! "video/x-raw,framerate=1/1" \    # 1 fps
+  ! videobalance contrast=2.0 \                  # increase contrast
+  ! videoconvert ! "video/x-raw,format=GRAY8" \  # greyscale
+  ! videocrop top=0 left=80 right=80 bottom=0 \  # 640x480 -> 480x480
+  ! videoscale ! "video/x-raw,height=28,width=28" \  # -> 28x28
+  ! multifilesink location="image.raw"
+\end{lstlisting}
+    Use \texttt{tee} to branch the stream (e.g. save both the 28$\times$28 raw and a
+    JPEG preview).
+\end{KR}
+
+\subsection{Beyond: GAN, Transformers, LLMs}
+
+\mult{2}
+
+\begin{definition}{GAN}
+    \important{Generative Adversarial Network}: a \important{generator} creates fake
+    samples to fool a \important{discriminator}, which classifies real vs fake; both
+    improve via back-propagation.
+\end{definition}
+
+\begin{definition}{AI Evolution}
+    \important{FCN} (math functions) $\to$ \important{CNN} (2-D spatial features) $\to$
+    \important{Transformers} (sequence/context) $\to$ \important{LLMs} (reasoning at
+    extreme scale).
+\end{definition}
+
+\multend
+
+\begin{definition}{LLMs (Transformer Workflow)}
+    \begin{enumerate}
+        \item \important{Tokenization \& embedding}: text $\to$ tokens $\to$
+              high-dimensional vectors
+        \item \important{Self-attention (QKV)}: Query/Key/Value vectors weigh how
+              relevant surrounding tokens are
+        \item \important{Probability \& softmax}: rank the vocabulary, pick the
+              highest-probability next token
+    \end{enumerate}
+    LLMs = \important{next-token prediction}; a text subset of GenAI, trained with
+    billions of parameters.
+\end{definition}
+
+\raggedcolumns

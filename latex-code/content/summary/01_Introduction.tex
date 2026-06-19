@@ -1,0 +1,391 @@
+\section{01 Introduction: Embedded Linux \& Yocto}
+
+\begin{concept}{Embedded Linux}
+    Embedded Linux is the use of the \important{Linux Kernel} together with various
+    \important{Open-Source components} in an embedded system.
+    \begin{itemize}
+        \item Kernel + userspace libraries/tools, tailored to a device
+        \item Huge ecosystem of ready-made components
+    \end{itemize}
+\end{concept}
+
+\begin{remark}
+    Why Linux in Embedded?
+    \begin{itemize}
+        \item \important{Re-use} of components: network stacks, multimedia,
+              graphics, crypto libs already exist $\rightarrow$ focus on the
+              \emph{added value} of your product
+        \item No need to re-write a kernel, TCP/IP-, USB-stack or GUI toolkit
+        \item \important{Low cost}: free software, copy onto unlimited devices,
+              no license fee (except GPL obligations $\rightarrow$ see L09);
+              even the dev tools are free
+    \end{itemize}
+\end{remark}
+
+\begin{concept}{Build System}
+    A build system automates building a complete target system (kernel + rootfs).
+    \mult{2}
+    \subparagraph{With build system}
+    \begin{itemize}
+        \item Auto download, configure, compile, install in the right order
+        \item Resolves all dependencies automatically
+        \item Build is \important{reproducible} $\rightarrow$ easy to reconfigure,
+              upgrade, fix bugs
+    \end{itemize}
+    \subparagraph{Without build system}
+    \begin{itemize}
+        \item Every app built by hand, rootfs from scratch
+        \item Each config + dependency done manually
+        \item Integrating software from different teams is painful
+    \end{itemize}
+    \multend
+\end{concept}
+
+\begin{definition}{Available Build Systems}
+    \begin{itemize}
+        \item \important{Buildroot} -- community, simple, small devices; weak for advanced
+              features / multi-machine support
+        \item \important{PTXdist} -- by Pengutronix
+        \item \important{OpenWRT} -- based on Buildroot (fork), embedded network devices/routers
+        \item \important{OpenEmbedded}-based: \important{Poky} (Yocto), Ångström; complex systems, lots of customization,
+        \important{multiple targets} at once $\rightarrow$ used in this course
+    \end{itemize}
+\end{definition}
+
+
+\subsection{The Yocto Project}
+
+\begin{concept}{What is Yocto?}
+    A set of \important{templates, tools and methods} to build \emph{custom}
+    embedded Linux-based systems.
+    \begin{itemize}
+        \item Open-source, started by the Linux Foundation (2010), led by
+              Richard Purdie
+        \item Based on the \important{OpenEmbedded} project
+        \item Supports x86, ARM, MIPS, PowerPC
+        \item \important{Layer architecture} $\rightarrow$ easy code re-use
+    \end{itemize}
+\end{concept}
+
+\begin{corollary}{Yocto is NOT a distribution}
+    Yocto is a \important{build system}, not an embedded Linux distribution and
+    not the Linux kernel. It \emph{creates a custom distribution} for you.
+\end{corollary}
+
+\mult{2}
+
+\begin{theorem}{The 3 Core Components}
+    \begin{enumerate}
+        \item \important{Poky} -- the reference system; collection of projects/tools
+              to generate a new Yocto-based distribution
+        \item \important{Layers (Metadata)} -- sets of recipes, layers and classes
+              shared between OpenEmbedded-based systems
+        \item \important{BitBake} -- the build engine (Python): reads/interprets
+              the metadata (recipes), then downloads, configures and builds
+              packages \& images
+    \end{enumerate}
+\end{theorem}
+
+%% >>> IMAGE (slide 14): Yocto layer-stack overview (bottom->top): oe-core (meta) | meta-yocto-bsp (= board support package) | meta-yocto | other layers <<<
+
+\includegraphics[width=\linewidth]{yocto_layers.png}
+
+\multend
+
+\begin{KR}{Conceptual Yocto Questions}
+    \textbf{Map every claim to one of the 3 building blocks.}
+    Decide whether the statement describes the \important{tooling/process}
+    (build system, BitBake, Poky, layers, OpenEmbedded) or a \important{result}
+    (a distribution, the kernel, an image).
+    \begin{itemize}
+        \item Process/tooling words $\rightarrow$ usually \important{true}
+        \item "is a distribution" / "is the kernel" $\rightarrow$ \important{false}
+              (those are \emph{outputs}, not what Yocto \emph{is})
+    \end{itemize}
+\end{KR}
+
+\begin{example2}{Exam Quiz: Which statements about Yocto are true? (slide 14)}
+    Select one or more (multiple choice):
+    \begin{itemize}
+        \item (1) \important{true} -- Yocto is a build system
+        \item (2) false -- it \emph{creates} a distribution, it is not one
+        \item (3) \important{true} -- built on OpenEmbedded
+        \item (4) false -- it is not the kernel
+    \end{itemize}
+\end{example2}
+
+\paragraph{Concept \& Directory Structure}
+
+%% >>> IMAGE (slide 18): Yocto concept -- "poky-mickledore" folder + "Additional Layers" (meta-mc2, meta-raspberrypi) both feed (arrows) into the generated "build" folder <<<
+
+\mult{2}
+
+\begin{definition}{Poky Folder (downloaded)}
+    Downloaded from Yocto, left \important{unchanged}:
+    \begin{itemize}
+        \item Tools (BitBake, etc.)
+        \item Default layer and recipes
+        \item Layers: \texttt{meta} (oe-core), \texttt{meta-yocto},
+              \texttt{meta-yocto-bsp}
+    \end{itemize}
+\end{definition}
+
+\begin{definition}{Additional Layers}
+    Downloaded from other sources or created by you:
+    \begin{itemize}
+        \item RPI layer (\texttt{meta-raspberrypi})
+        \item MC2 layer (\texttt{meta-mc2})
+    \end{itemize}
+\end{definition}
+
+\multend
+
+\begin{definition}{Build Folder (generated)}
+    Generated by Yocto, configuration edited \important{manually}.
+    Created/entered with \texttt{oe-init-build-env}; Poky stays untouched.
+    \begin{itemize}
+        \item \texttt{conf/} -- image- \& layer configuration
+        \item \texttt{downloads/} -- all downloaded source files
+        \item \texttt{sstate-cache/} -- shared state cache
+        \item \texttt{tmp/} -- intermediate \& final files:
+        \begin{itemize}
+            \item \texttt{tmp/deploy/} final output, \texttt{.../images/} flash images
+            \item \texttt{tmp/work/} per-architecture work dirs
+            \item \texttt{tmp/sysroots/} shared libs \& headers for compiling
+            \item \texttt{tmp/buildstats/} build statistics
+        \end{itemize}
+    \end{itemize}
+    \important{Clean state:}
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+rm -rf tmp
+bitbake -c cleansstate core-image-minimal
+\end{lstlisting}
+\end{definition}
+
+%% >>> IMAGE (slides 20-22): directory trees -- poky/ (bitbake, meta, meta-yocto, meta-yocto-bsp, scripts) and build/ (conf, downloads, sstate-cache, tmp) <<<
+
+\subsection{Configuring the System}
+
+\begin{definition}{The 2 Config Files}
+    Configure the system in two files inside \texttt{build/conf/}:
+    \begin{itemize}
+        \item \texttt{bblayers.conf} -- which layers are used
+        \item \texttt{local.conf} -- target machine, directories, mirrors/repos,
+              extra settings, additional applications
+    \end{itemize}
+\end{definition}
+
+\begin{formula}{BitBake Variable Assignment (slide 26)}
+    \begin{itemize}
+        \item \texttt{=}\ \ assign; value expanded \emph{when used} (lazy)
+        \item \texttt{:=}\ immediately expand the value
+        \item \texttt{?=}\ assign \emph{only if} nothing was assigned yet (default)
+        \item \texttt{??=}\ same, but \important{lower} precedence (weak default)
+    \end{itemize}
+    Last non-conditional \texttt{=} wins; \texttt{?=} loses to a real \texttt{=}.
+\end{formula}
+
+\begin{examplecode}{bblayers.conf + machine (slides 25--28)}
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+# build/conf/bblayers.conf
+BBLAYERS ?= " \
+  /home/mc2/poky-mickledore/meta \
+  /home/mc2/poky-mickledore/meta-poky \
+  /home/mc2/poky-mickledore/meta-yocto-bsp \
+  /home/mc2/rpi64/meta-raspberrypi \
+  /home/mc2/rpi64/meta-mc2 \
+  /home/mc2/rpi64/meta-student \
+"
+# build/conf/local.conf
+MACHINE = "raspberrypi4-64"
+\end{lstlisting}
+    Machine file lives in
+    \texttt{meta-<bsp>/conf/machine/<MACHINE>.conf}, e.g.
+    \texttt{raspberrypi4-64.conf}; its name must match the \texttt{MACHINE} value.
+\end{examplecode}
+
+\subsubsection{BitBake \& Building}
+
+\begin{definition}{BitBake Commands \& Targets}
+    \texttt{bitbake [options] [target]} builds a target.
+    Useful targets:
+
+    \mult{2}
+    \begin{itemize}
+        \item \texttt{core-image-minimal} -- small bootable CLI image
+        \item \texttt{core-image-sato} -- image with Sato \\ (GNOME mobile UI)
+    \end{itemize}
+    \begin{itemize}
+        \item \texttt{core-image-full-cmdline} -- the \important{MC2 image}
+        \item \texttt{meta-toolchain} -- headers/libs to develop on target
+        \item \texttt{meta-ide-support} -- cross-toolchain for the SDK
+    \end{itemize}
+    \multend
+\end{definition}
+
+\begin{KR}{Build a Yocto Image}
+    \textbf{Step 1 -- enter build env} (sets all env vars; \texttt{build/} already
+    prepared for MC2):
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+source ~/poky-mickledore/oe-init-build-env ~/rpi64/build
+\end{lstlisting}
+    \textbf{Step 2 -- configure} \texttt{bblayers.conf} (layers) and
+    \texttt{local.conf} (set \texttt{MACHINE}).
+
+    \textbf{Step 3 -- build:}
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+bitbake core-image-full-cmdline
+\end{lstlisting}
+    \important{First build takes 3--4 h} (downloads all sources + compiles).
+    Output lands in \texttt{tmp/deploy/images/<machine>/}.
+\end{KR}
+
+\paragraph{Layers}
+
+\begin{KR}{Create \& Add a New Layer}
+    \textbf{Step 1 -- create} the layer (adds config dir + optional example recipe):
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+source ~/poky-mickledore/oe-init-build-env ~/rpi64/build
+bitbake-layers create-layer ../meta-student
+bitbake-layers add-layer    ../meta-student
+\end{lstlisting}
+    \textbf{Step 2 -- (alternative) register manually} by adding the layer's
+    \important{absolute path} to \texttt{BBLAYERS} in \texttt{build/conf/bblayers.conf}.
+
+    \paragraph{conclusion}
+    BitBake parses every layer in \texttt{BBLAYERS} and picks up its recipes,
+    config files and classes. Layer location on disk does not matter (but keep
+    it next to the other layers).
+\end{KR}
+
+\mult{2}
+
+\begin{definition}{Files in a Created Layer}
+    \begin{itemize}
+        \item \texttt{conf/layer.conf} -- layer config (rarely edited)
+        \item \texttt{COPYING.MIT} -- layer license (default MIT)
+        \item \texttt{README} -- description
+        \item \texttt{recipes-*/*/*.bb} -- auto-parsed by BitBake
+    \end{itemize}
+\end{definition}
+
+\begin{definition}{BSP \& Useful Layers}
+    \important{BSP layer} = metadata for specific hardware (kernel, bootloader,
+    machine \texttt{.conf}), named \texttt{meta-<bsp>}; behaves like a normal layer.
+\end{definition}
+
+\multend
+
+\paragraph{Recipes}
+
+\begin{concept}{Recipe}
+    A recipe is the \important{"list of ingredients" + "cooking instructions"} to
+    build one or more packages. It holds configuration variables and a common set
+    of tasks, all run through BitBake.
+\end{concept}
+
+%% >>> IMAGE (slide 39): recipe directory structure -- recipes-myapps/hello/{files/GPL-2, hello.c, hello_1.0.bb} (note the underscore before the version) <<<
+
+
+
+\begin{definition}{A .bb Recipe -- 3 Parts}\\
+    \textbf{Header}: \texttt{DESCRIPTION}, \texttt{HOMEPAGE}, \texttt{SECTION}, \texttt{LICENSE}, \texttt{LIC\_FILES\_CHKSUM}, \texttt{COMPATIBLE\_MACHINE}
+ 
+    \textbf{Sources}: \texttt{SRC\_URI} -- location of source + license files, \texttt{S} -- set when source is not from an external repo
+
+    \textbf{Tasks}: \texttt{do\_compile()}, \texttt{do\_install()}, \dots
+\end{definition}
+
+\begin{minipage}{0.6\linewidth}
+\begin{examplecode}{Recipe: hello\_1.0.bb (slide 41)}
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+DESCRIPTION = "Example recipe for an application"
+SECTION = "examples"
+LICENSE = "GPL-2"
+SRC_URI = "file://hello.c file://GPL-2"
+LIC_FILES_CHKSUM = "file://GPL-2;md5=94d55d...19f"
+S = "${WORKDIR}"
+do_compile() {
+${CC} ${CFLAGS} ${LDFLAGS} ${WORKDIR}/hello.c -o hello
+}
+do_install() {
+install -d ${D}${bindir}
+install -m 0755 hello ${D}${bindir}
+}
+\end{lstlisting}
+\end{examplecode}
+\end{minipage}
+\begin{minipage}{0.39\linewidth}
+\begin{corollary}{Default Recipe Tasks}
+    \begin{itemize}
+        \item \texttt{do\_fetch} get sources
+        \item \texttt{do\_unpack} unpack
+        \item \texttt{do\_patch} apply patches
+        \item \texttt{do\_configure}
+        \item \texttt{do\_compile}
+        \item \texttt{do\_install}
+        \item \texttt{do\_package}
+        \item \texttt{do\_rootfs} build rootfs
+    \end{itemize}
+    Override in the \texttt{.bb}; list with \texttt{bitbake <recipe> -c listtasks}.
+\end{corollary}
+\end{minipage}
+
+
+\begin{remark2}{License Checksum}
+    \texttt{LIC\_FILES\_CHKSUM} tracks the license file. If the upstream license
+    changes, the checksum changes and the \important{build fails} until the recipe
+    is updated. Mandatory in every recipe \emph{unless} \texttt{LICENSE = "CLOSED"}.
+\end{remark2}
+
+\subsection{Kochrezepte and Exam Examples}
+
+\begin{KR}{Add an Application (slide 44)}
+    \textbf{Step 1} -- (optional) create a meta-layer
+    (\texttt{bitbake-layers create-layer new-layer}) and create the app's
+    directory structure inside the meta-layer.
+
+    \textbf{Step 2} -- add the layer in \texttt{build/conf/bblayers.conf}.
+
+    \textbf{Step 3} -- write the application + add a license file, then create the
+    recipe (e.g. \texttt{myexample\_0.1.bb}).
+
+    \textbf{Step 4} -- edit \texttt{build/conf/local.conf} to install the app:
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+IMAGE_INSTALL_append = " myexample"
+\end{lstlisting}
+\end{KR}
+
+\begin{KR}{Create the SD-Card (slide 45)}
+    The SD-card (MBR) is split into two partitions:
+    \begin{itemize}
+        \item \important{BOOT} -- boot loader, Linux kernel, device tree
+        \item \important{ROOT} -- filesystem: executables, libraries, data
+    \end{itemize}
+    Copy the generated image with \texttt{bmaptool}:
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+sudo bmaptool copy \
+  tmp/deploy/images/raspberrypi4-64/\
+core-image-full-cmdline-raspberrypi4-64.wic.bz2 \
+  "/dev/${SD_CARD}"
+\end{lstlisting}
+\end{KR}
+
+\subsection{Exam Exercise (Probepr\"ufung 2021)}
+
+\begin{example2}{Exam 2021 A1: Yocto basics}
+    \begin{enumerate}
+        \item What is Yocto?
+        \item In which config file do you register a new layer \texttt{mylayer}?
+              And a new application \texttt{myapp}?
+    \end{enumerate}
+    \tcblower
+    \begin{itemize}
+        \item Yocto = a set of \important{templates / tools / methods} to build
+              custom embedded Linux systems
+        \item layer $\to$ \texttt{build/conf/bblayers.conf}
+        \item app $\to$ \texttt{build/conf/local.conf}
+    \end{itemize}
+\end{example2}
+
+\raggedcolumns

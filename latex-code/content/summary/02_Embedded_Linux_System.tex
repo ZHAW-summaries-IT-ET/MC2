@@ -1,0 +1,461 @@
+\section{02 Embedded Linux System}
+
+\subsection{Basic Linux Commands}
+
+\mult{2}
+
+\begin{definition}{Navigation \& Search}
+    \begin{itemize}
+        \item \texttt{ls -altrh} -- long, all, by time, human sizes
+        \item \texttt{cd /usr/bin}, \texttt{cd ..}, \texttt{cd \textasciitilde} (home)
+        \item \texttt{pwd} -- print working dir
+        \item \texttt{which ls} -- show path of a command
+        \item \texttt{locate stdio.h} -- find file by name (db)
+        \item \texttt{grep -iR test *} -- search in files (i=case-insens., R=recursive)
+        \item \texttt{find . -name "test.c"} -- find file in tree
+    \end{itemize}
+\end{definition}
+
+\begin{definition}{Files \& Permissions}
+    \begin{itemize}
+        \item \texttt{cat} / \texttt{more} / \texttt{less} -- display a file
+        \item \texttt{cp foo bar}, \texttt{cp -a dir1 dir2} (all/recursive)
+        \item \texttt{mv foo bar} -- move / rename
+        \item \texttt{mkdir foo}, \texttt{rm foo}, \texttt{rm -rf dir} (force, recursive)
+        \item \texttt{chown -R foo:bar /home/foo} -- change owner
+        \item \texttt{chgrp bar /home/foo} -- change group
+        \item \texttt{df -h} (disk usage), \texttt{du -skh \textasciitilde/} (space used)
+    \end{itemize}
+\end{definition}
+
+\multend
+
+\begin{definition}{Archives / Mount / Pipes / Links}
+    \mult{2}
+    \begin{itemize}
+        \item \texttt{tar zcvf l.tgz l} -- compress dir (z=gzip, c=create, v=verbose, f=file)
+        \item \texttt{tar zxvf l.tgz} -- extract (x)
+        \item \texttt{gzip -9 f.txt} / \texttt{gunzip f.gz}
+        \item \texttt{touch foo} -- empty file / update timestamp
+        \item \texttt{mount /dev/sda1 /media/hd}, \texttt{umount /media/hd}
+    \end{itemize}
+    \begin{itemize}
+        \item Pipe/redirect: \texttt{cal > foo}, \texttt{cat < /etc/passwd}
+        \item \texttt{cat /dev/zero > foo} -- writes zeros (fills disk!)
+        \item Backtick: \texttt{echo "date is `date`"} -- insert cmd output
+        \item \texttt{ln a b} -- \important{hard link} (2 names $\to$ same inode, survives delete, no cross-FS)
+        \item \texttt{ln -s a b} -- \important{soft link} (shortcut, can cross FS, breaks if target deleted)
+    \end{itemize}
+    \multend
+\end{definition}
+
+\subsection{Embedded Hardware \& Architecture}
+
+%% >>> IMAGE (slide 6): simplified Linux system -- Userspace (apps, C library) on top, Linux kernel (task/memory mgmt, networking, device drivers, filesystems), Hardware at the bottom <<<
+
+\mult{2}
+
+\begin{concept}{Linux System Structure}
+    Clear separation of \important{Userspace} and \important{Kernelspace}.
+    \begin{itemize}
+        \item Userspace: applications + C library
+        \item Kernel: task/memory mgmt, networking, device drivers, filesystems
+    \end{itemize}
+\end{concept}
+
+\begin{definition}{Boot Sequence}
+    \begin{enumerate}
+        \item \important{Bootloader} -- loads device tree + kernel to RAM, starts kernel
+        \item \important{Kernel} -- inits hardware/subsystems, mounts root FS (from
+              \texttt{root=}), starts init app (\texttt{/sbin/init})
+        \item \important{/sbin/init} -- starts userspace services \& shell
+    \end{enumerate}
+\end{definition}
+
+\multend
+
+\mult{2}
+
+\begin{definition}{Supported Architectures}
+    32- and 64-bit:
+    \begin{itemize}
+        \item x86 / x86\_64, \important{ARM} (100s of SoCs), RISC-V
+        \item PowerPC (real-time/industrial), MIPS (networking)
+        \item SuperH, Blackfin (DSP), Microblaze (Xilinx FPGA soft-core), \dots
+    \end{itemize}
+\end{definition}
+
+\begin{definition}{Requirements}
+    \begin{itemize}
+        \item MMU \important{and} non-MMU (latter has limits)
+        \item RAM: min 8 MB, normally $\geq$ 32 MB
+        \item Storage: 4 MB Flash/Ramdisk; SD/MMC block storage ok
+        \item \important{Not} for small microcontrollers
+    \end{itemize}
+\end{definition}
+
+\multend
+
+\begin{definition}{Hardware Platform Types}
+    \begin{itemize}
+        \item \important{Component on Module (CoM)}: small board, only CPU/RAM/flash +
+              connectors $\to$ write/integrate peripheral drivers in kernel
+        \item \important{Evaluation platform}: from SoC vendor, expensive, many
+              built-in peripherals, unsuitable for real products
+        \item \important{Custom platform}: own schematics $\to$ write/integrate drivers
+    \end{itemize}
+\end{definition}
+
+\subsection{Filesystem}
+
+\begin{concept}{Root Filesystem}
+    \begin{itemize}
+        \item Root of the hierarchy is \texttt{/}; \texttt{mount} attaches other FS inside it
+        \item Root FS = \important{first mounted} FS, mounted directly by the kernel
+              via the \texttt{root=} kernel option
+        \item No root FS $\to$ \important{kernel panic}: \emph{"VFS: Unable to mount root
+              fs on unknown block(0,0)"} $\to$ append a correct \texttt{root=}
+    \end{itemize}
+\end{concept}
+
+\begin{example2}{Exam Quiz: What is true about the root filesystem? (slide 11)}
+    Select one or more:
+    \begin{enumerate}
+        \item \texttt{cd \textasciitilde/yocto} brings us to a \texttt{yocto} dir in root
+        \item Under root are: \texttt{\textasciitilde/yocto} or \texttt{\textasciitilde/board}
+        \item Under root are: \texttt{/etc} or \texttt{/home}
+        \item \texttt{cd /sys} brings us to a \texttt{sys} dir in root
+    \end{enumerate}
+    \tcblower
+    \important{Correct: (3) and (4).}
+    \begin{itemize}
+        \item (1),(2) false -- \texttt{\textasciitilde} is the \important{home} dir
+              (\texttt{/home/<user>}), \emph{not} root \texttt{/}
+        \item (3),(4) true -- \texttt{/etc}, \texttt{/home}, \texttt{/sys} sit directly
+              under \texttt{/}
+    \end{itemize}
+\end{example2}
+
+\begin{KR}{Filesystem Path Questions}
+    Decide where a path points by its \important{first character}:
+    \begin{itemize}
+        \item starts with \texttt{/} $\to$ absolute, under \important{root}
+        \item starts with \texttt{\textasciitilde} $\to$ under \important{home}
+              (\texttt{/home/<user>}), never directly under root
+        \item starts with \texttt{./} or a name $\to$ relative to current dir
+    \end{itemize}
+\end{KR}
+
+%% >>> IMAGE (slide 13): typical Linux file tree under / (bin, boot, dev, etc, home, lib, mnt, proc, root, sys, usr, var ...) <<<
+
+\mult{2}
+
+\begin{definition}{Core Directories}
+    \begin{itemize}
+        \item \texttt{/proc} -- proc pseudo-FS (OS/process info)
+        \item \texttt{/sys} -- sysfs pseudo-FS (devices/buses)
+        \item \texttt{/dev} -- device files
+        \item \texttt{/lib} -- basic libraries \& modules
+        \item \texttt{/bin}, \texttt{/sbin} -- basic (system) programs
+        \item \texttt{/etc} -- system-wide configuration
+        \item \texttt{/media}, \texttt{/mnt} -- removable / static mount points
+    \end{itemize}
+\end{definition}
+
+\begin{definition}{Additional Directories}
+    \begin{itemize}
+        \item \texttt{/boot} -- kernel image (on PCs)
+        \item \texttt{/home} -- user home dirs, \texttt{/root} -- root user home
+        \item \texttt{/tmp} -- temporary files
+        \item \texttt{/var} -- variable data (spool, logs, admin)
+        \item \texttt{/usr/bin}, \texttt{/usr/lib}, \texttt{/usr/sbin} -- user programs/libs/sys progs
+    \end{itemize}
+\end{definition}
+
+\multend
+
+\begin{concept}{Pseudo / Virtual Filesystems}
+    System \& kernel info exposed as files that \important{do not exist on real
+    storage} -- created/updated on the fly by the kernel.
+    \begin{itemize}
+        \item \texttt{/proc} -- OS info: processes, memory parameters, \dots
+        \item \texttt{/sys} -- system as a set of devices \& buses
+        \item Hierarchical; an interface to the kernel, but \emph{not the only} way
+              to do system calls
+    \end{itemize}
+\end{concept}
+
+\mult{2}
+
+\begin{definition}{Info in /proc}
+    \begin{itemize}
+        \item \texttt{/proc/<pid>/cmdline} -- start command
+        \item \texttt{.../cwd} -- working dir (link)
+        \item \texttt{.../environ} -- env variables
+        \item \texttt{.../exe} -- running program (link)
+        \item \texttt{.../fd/} -- open files
+        \item \texttt{.../mem}, \texttt{.../stat}, \texttt{.../statm}
+        \item \texttt{/proc/device-tree} -- device tree
+    \end{itemize}
+\end{definition}
+
+\begin{examplecode}{Device Files /dev (slide 17)}
+    \texttt{b}=block, \texttt{c}=char device (\texttt{ls -l /dev}). Write to a serial port:
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+FILE *fp;
+fp = fopen("/dev/ttyS0", "rw");
+fprintf(fp, "Hello");
+fclose(fp);
+\end{lstlisting}
+    (Access typically needs \texttt{sudo}.)
+\end{examplecode}
+
+\multend
+
+\begin{examplecode}{NFS Mount Points -- Lab2--13 (slides 19--20)}
+    Root FS \& home served over NFS from the host:
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+192.168.0.100:/srv/rpi_rootfs    -> /
+192.168.0.100:/home/mc2/board    -> /home/root
+# on target:
+root@raspberrypi4-64:~# df -h
+Filesystem                     Size Used Avail Use% Mounted on
+192.168.0.100:/srv/rpi_rootfs  982M 779M  133M  86% /
+devtmpfs                       666M    0  666M   0% /dev
+192.168.0.100:/home/mc2/board   80G  36G   41G  47% /home/root
+\end{lstlisting}
+\end{examplecode}
+
+\subsection{Toolchain for Embedded Linux}
+
+\begin{concept}{Host vs. Target}
+    \begin{itemize}
+        \item \important{Host} -- development PC running Linux
+        \item \important{Target} -- the embedded system under development
+        \item Connected via: \important{serial} (almost always, debugging),
+              Ethernet (frequent), JTAG (low-level debug)
+    \end{itemize}
+\end{concept}
+
+\mult{2}
+
+\begin{definition}{Native vs. Cross Toolchain}
+    \begin{itemize}
+        \item \important{Native}: runs on workstation, generates code for the same
+              machine (usually x86)
+        \item \important{Cross-compiling}: runs on workstation (x86), generates code
+              for the target (e.g. ARM)
+        \item Native-on-target: runs on \& builds for the target
+    \end{itemize}
+\end{definition}
+
+\begin{definition}{Embedded Linux Solutions}
+    \begin{itemize}
+        \item \important{Commercial} (own tools, open + proprietary mix): MontaVista,
+              Wind River, TimeSys
+        \item \important{Open source}, community-supported $\to$ \emph{used in this course}
+        \item Host PC: any recent Linux desktop; course uses \important{Fedora}
+    \end{itemize}
+\end{definition}
+
+\multend
+
+\begin{definition}{The 4 Toolchain Components (slide 34)}
+    \begin{enumerate}
+        \item \important{GCC} (GNU Compiler Collection) -- C/C++/Ada/Fortran/\dots,
+              60+ platforms; GPL (libs LGPL)
+        \item \important{Binutils} -- generate/manipulate binaries:
+              \texttt{as} (assembler), \texttt{ld} (linker), \texttt{ar}/\texttt{ranlib}
+              (archives), \texttt{objdump}/\texttt{readelf}/\texttt{nm}/\texttt{size}/\texttt{strings}
+              (inspect), \texttt{strip} (shrink)
+        \item \important{Kernel source \& headers} -- syscalls, constants, structs;
+              under \texttt{<linux/...>}, \texttt{<asm/...>}; needed to build the C library
+        \item \important{C library} -- interface kernel $\leftrightarrow$ apps, provides
+              standard C API (\texttt{printf}\dots); chosen when GCC is compiled
+    \end{enumerate}
+\end{definition}
+
+\subsection{C Libraries \& BusyBox}
+
+\mult{2}
+
+\begin{definition}{C Libraries}
+    \begin{itemize}
+        \item \important{glibc} -- standard GNU/Linux, perf+portable (LGPL);
+              big: \textasciitilde1.7 MB on ARM
+        \item \important{uClibc} -- lightweight for embedded (LGPL), \textasciitilde400 KB
+        \item \important{musl} -- \textasciitilde400 KB, MIT
+        \item \important{dietlibc} -- \textasciitilde185 KB, GPL (stopped 2024)
+    \end{itemize}
+\end{definition}
+
+\begin{definition}{BusyBox}
+    The \important{"Swiss army knife"}: most CLI utilities in a \important{single
+    executable} (even a web server!).
+    \begin{itemize}
+        \item $<$1 MB (static, glibc), $<$500 KB (static, uClibc)
+        \item ls, cp, mount, grep, vi, wget, init, \dots (hundreds)
+    \end{itemize}
+\end{definition}
+
+\multend
+
+\begin{formula}{"Hello World" Size Comparison (slide 44)}
+    \begin{center}
+    \begin{tabular}{l|c|c|c}
+        & static & dynamic & dyn. library \\\hline
+        \important{uClibc} & 18 kB  & 2.5 kB & 400 kB \\
+        \important{glibc}  & 361 kB & 2.7 kB & 1.7 MB \\
+    \end{tabular}
+    \end{center}
+    $\Rightarrow$ uClibc wins massively when \important{statically} linked.
+\end{formula}
+
+\subsection{Building a Minimalistic Linux System}
+
+%% >>> IMAGE (slide 40): minimal Linux stack -- Linux Kernel + C-Library (uClibc/glibc) + Main App (BusyBox) + start process /etc/inittab + pseudo-FS (/proc /dev /sys) on the Root Filesystem, serial link to Host-PC <<<
+
+\begin{KR}{Build the Smallest Possible Linux}
+    \textbf{Step 1 -- Kernel} (from \texttt{kernel.org}):
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+make allnoconfig          # reset config to minimal
+make menuconfig           # add only needed features
+make                      # -> arch/x86/boot/bzImage
+\end{lstlisting}
+    \textbf{Step 2 -- Root FS image} (\important{1 inode/1024 B} $\to$ \textasciitilde400 files):
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+dd if=/dev/zero of=rootfs.img bs=1k count=400
+mkfs.ext2 -i 1024 -F rootfs.img
+\end{lstlisting}
+    \textbf{Step 3 -- BusyBox + uClibc} (static, cross-compiled $\to$ \textasciitilde250k exe):
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+make menuconfig           # static, uClibc toolchain
+make
+make install              # into _install/
+\end{lstlisting}
+    \textbf{Step 4 -- Populate \& flush the FS:}
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+mkdir /mnt/rootfs
+mount -o loop rootfs.img /mnt/rootfs
+rsync -a busybox/_install/ /mnt/rootfs/
+chown -R root:root /mnt/rootfs/
+sync
+\end{lstlisting}
+    \paragraph{conclusion}
+    Test without flashing hardware by booting in \important{QEMU} (next box).
+\end{KR}
+
+\begin{examplecode}{Boot the System in QEMU (slide 51)}
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+qemu \
+  -m 32 \                          # RAM (MB) of emulated target
+  -hda rootfs.img \                # emulated hard disk
+  -kernel arch/x86/boot/bzImage \  # kernel image
+  -append "root=/dev/hda"          # kernel command line
+\end{lstlisting}
+\end{examplecode}
+
+\subsection{Bootloaders}
+
+\begin{concept}{Bootloader}
+    Software that runs first and is responsible for:
+    \begin{itemize}
+        \item basic hardware initialization
+        \item loading the OS kernel (flash / network / non-volatile storage)
+        \item optionally decompressing the kernel, then \important{starting} it
+        \item usually a minimal shell (load data, inspect memory, diagnostics)
+    \end{itemize}
+\end{concept}
+
+\mult{2}
+
+\begin{definition}{x86 Bootloaders}
+    \begin{itemize}
+        \item \important{GRUB} -- most powerful; reads many FS, network boot, shell
+        \item \important{Syslinux} -- network \& removable media (USB, CD-ROM)
+    \end{itemize}
+\end{definition}
+
+\begin{definition}{Embedded Bootloaders}
+    \begin{itemize}
+        \item \important{U-Boot} (Denx) -- de-facto standard (ARM, PPC, MIPS, x86\dots)
+        \item \important{Barebox} -- successor of U-Boot, cleaner, less HW support
+        \item RedBoot, Yaboot, PMON (minor)
+    \end{itemize}
+\end{definition}
+
+\multend
+
+\begin{corollary}{Raspberry Pi 4 Boot Process (slides 56--57)}
+    BCM2711 powers up; Boot-ROM loads the main bootloader from EEPROM, which uses
+    \texttt{BOOT\_ORDER} (SD / network / USB). Stages:
+    \begin{enumerate}
+        \item \important{GPU 1st-stage} (ROM, fixed) -- mounts FAT32 boot partition
+        \item \important{GPU 2nd-stage} (EEPROM) -- loads/programs GPU firmware, restarts GPU
+        \item \important{GPU firmware} (\texttt{start.elf}) -- configures SDRAM, starts CPU
+        \item \important{CPU} -- runs \texttt{kernel8.img} (Linux) or 3rd-stage (U-Boot)
+    \end{enumerate}
+    Boot methods: \important{Method 1} SD-card (Lab1), \important{Method 2} network/NFS (Lab2).
+\end{corollary}
+
+\subsection{Inspecting \& Programming the System}
+
+\begin{KR}{Inspect a Running System via /proc (slide 59)}
+\begin{lstlisting}[language=bash, style=basesmol, aboveskip=2pt, belowskip=2pt]
+cat /proc/version           # kernel version
+cat /proc/cpuinfo           # CPU details
+grep Free /proc/meminfo     # free memory
+\end{lstlisting}
+\end{KR}
+
+\begin{definition}{File Handling in C}
+    \begin{itemize}
+        \item Open/close: \texttt{fopen()}, \texttt{fclose()}
+        \item Write: \texttt{fputs()}, \texttt{fputc()}, \texttt{fprintf()}, \texttt{fwrite()} (binary)
+        \item Read: \texttt{fgets()}, \texttt{fgetc()}, \texttt{fscanf()}, \texttt{fread()} (binary)
+    \end{itemize}
+\end{definition}
+
+\begin{examplecode}{File Handling Example (slide 62)}
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+#include <stdio.h>
+void display_file() {
+FILE *fp;
+char str[100];
+fp = fopen("file.txt", "rw");   // open for read/write
+if (fp == NULL) {
+printf("Error opening file\n");
+return;
+}
+if (fgets(str, 100, fp) != NULL)
+printf("%s\n", str);
+fclose(fp);
+}
+\end{lstlisting}
+\end{examplecode}
+
+\begin{examplecode}{Command-Line Interface "mymenu" (slide 60)}
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+int main(void) {
+char line[100];
+int a1 = 0, a2 = 0; char b[100];
+while (1) {
+printf("Command > ");
+fgets(line, 100, stdin);
+if (line[0] == 'x') return 0;     // exit
+switch (line[0]) {
+case 'a':                         // read 2 ints
+sscanf(&line[1], "%d %d", &a1, &a2);
+command1(a1, a2); break;
+case 'b':                         // read string
+sscanf(&line[1], "%s", b);
+command2(b); break;
+default:
+printf("Unknown command '%c'\n", line[0]);
+}
+}
+}
+\end{lstlisting}
+\end{examplecode}
+
+\raggedcolumns

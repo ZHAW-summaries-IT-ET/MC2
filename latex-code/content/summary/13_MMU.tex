@@ -1,0 +1,272 @@
+\section{13 Virtual Memory (MMU)}
+
+\subsection{The Problem \& the MMU}
+
+\mult{2}
+
+\begin{concept}{Logical vs. Physical Address Space}
+    \begin{itemize}
+        \item \important{logical $\ll$ physical}: the address capacity is limited by
+              the \important{architecture} (e.g. C8086: 640k usable) $\to$ expand it
+        \item \important{logical $\gg$ physical}: \important{physical memory too
+              small} $\to$ use disk as virtual memory (\important{swapping})
+        \item today (64-bit): the limit is the \important{physical memory}
+    \end{itemize}
+\end{concept}
+
+\begin{definition}{The MMU}
+    The Memory Management Unit sits between CPU and memory and \important{translates
+    logical (virtual) addresses to physical addresses} (LA$\to$PA), under OS control.
+\end{definition}
+
+\multend
+
+\subsection{Memory Expansion (Historical)}
+
+\begin{definition}{Overlay \& Bank Switching}
+    \begin{itemize}
+        \item \important{Overlay}: load program phases from disk into one shared
+              memory region as needed
+        \item \important{Bank switching} (C8080): 16 address bits $\to$ 64 kByte.
+              Lower 32 kByte \important{fixed} (\texttt{A15=0}); upper 32 kByte
+              \important{paged} (\texttt{A15=1}) via a 2-bit \important{page register}
+              $\to$ 4$\times$32 kByte banks
+    \end{itemize}
+\end{definition}
+
+\subsection{Segmentation}
+
+\begin{definition}{Fixed vs. Variable Partitions}
+    \begin{itemize}
+        \item \important{Fixed} partitions: each process has a \important{base
+              register}; a process switch triggers a page switch (OS)
+        \item \important{Variable} (Intel 8086): physical addr = (16-bit segment
+              register $\times$ 16) + 16-bit offset = \important{20-bit} physical;
+              base = \texttt{n$\times$0x10}, freely placed
+        \item a \important{limit register} bounds the segment $\to$ overflow =
+              \important{protection fault}
+    \end{itemize}
+\end{definition}
+
+\begin{formula}{8086 Segment Translation}
+    $$\text{phys} = (\text{segment} \ll 4) + \text{offset}$$
+    e.g. segment \texttt{0x5A23}, offset \texttt{0x1234}:
+    \texttt{0x5A230 + 0x1234 = 0x5B464}.
+\end{formula}
+
+\subsection{Paging}
+
+%% >>> IMAGE (slide 22): virtual addr [VPN|VPO] -> page table (indexed by VPN via PTBR, valid bit) -> physical addr [PPN|PPO], PPO = VPO <<<
+
+\begin{concept}{Paging Principle}
+    RAM is split into fixed-size \important{page frames} (typ. 4 kB); a process is
+    split into equal-size \important{blocks} (block size = frame size). A per-process
+    \important{page table} (in RAM) maps blocks $\to$ frames, so blocks need
+    \important{not} be contiguous.
+\end{concept}
+
+\begin{formula}{Address Translation}
+    Virtual address = \important{VPN} (virtual page nr) + \important{VPO} (offset);
+    physical address = \important{PPN} (physical page nr) + \important{PPO}.
+    \begin{itemize}
+        \item the \important{VPN indexes} the page table (base in \important{PTBR})
+        \item \important{PPO = VPO} (offset unchanged by translation)
+        \item \important{valid/present bit = 0} $\to$ \important{page fault} (not in RAM)
+    \end{itemize}
+\end{formula}
+
+\mult{2}
+
+\begin{definition}{Demand Paging \& Swapping}
+    \begin{itemize}
+        \item \important{Demand paging}: load a block from disk only when needed; the
+              \important{present bit} says whether it's in RAM
+        \item \important{Swapping}: if RAM is full, a \important{replacement policy}
+              (\important{FIFO / LRU / LFU}) picks a victim
+        \item \important{Controlled write-back}: only write the victim to disk if its
+              \important{dirty bit = 1}
+    \end{itemize}
+\end{definition}
+
+\begin{definition}{Protection \& Sharing}
+    \begin{itemize}
+        \item \important{Protection bits} per entry: executable / read-only /
+              user-accessible
+        \item \important{Sharing}: one frame can map into several processes with
+              \important{different rights} (e.g. \texttt{SUP} = kernel-only)
+    \end{itemize}
+\end{definition}
+
+\multend
+
+\subsection{Dimensioning Formulas (critical!)}
+
+\begin{formula}{Core MMU Formulas}
+    Let page size $P$, virtual address $= v$ bits, physical address $= m$ bits.
+    \begin{itemize}
+        \item page offset bits: $\;\text{VPO} = \text{PPO} = \log_2 P$
+        \item virtual page nr: $\;\text{VPN} = v - \text{VPO}$
+        \item physical page nr: $\;\text{PPN} = m - \text{PPO}$
+        \item \important{\# page table entries} $= 2^{\text{VPN}} = \dfrac{\text{virtual address space}}{P}$
+        \item page table size $= (\text{\# entries}) \times (\text{entry width})$
+    \end{itemize}
+\end{formula}
+
+\begin{KR}{Dimensioning a Paging System}
+    \begin{enumerate}
+        \item offset bits $= \log_2(\text{page size})$ \quad(VPO = PPO)
+        \item $\text{VPN} = (\text{virtual addr bits}) - \text{VPO}$
+        \item $\text{PPN} = (\text{physical addr bits}) - \text{PPO}$
+        \item \# entries $= 2^{\text{VPN}}$
+        \item page table size $= 2^{\text{VPN}} \times$ entry width
+    \end{enumerate}
+\end{KR}
+
+\subsection{Worked Examples \& Exercises}
+
+\begin{example2}{Dimensioning Example (slide 39)}
+    4 GByte virtual (32-bit), 16 MByte physical (24 addr lines), \important{block size
+    1 MByte}:
+    \tcblower
+    \begin{itemize}
+        \item page offset $= \log_2(1\text{M}) = \important{20}$ bit
+        \item page number (VPN) $= 32 - 20 = \important{12}$ bit $\to 2^{12} =
+              \important{4096}$ table entries
+        \item physical block nr (PPN) $= 24 - 20 = \important{4}$ bit
+    \end{itemize}
+\end{example2}
+
+\begin{example2}{Page Table Size (slide 42)}
+    32-bit virtual, 4 kByte pages (offset 12), entry width \textasciitilde19 bit:
+    \tcblower
+    VPN $= 32-12 = 20 \to 2^{20}$ entries.
+    $$2^{20} \times 19\,\text{bit} = 19.9\,\text{Mbit} \approx \important{2.5\ \text{MByte}}$$
+    (the page table itself lives in main memory).
+\end{example2}
+
+\begin{example2}{Exercise 1 -- Number of Page Table Entries (slide 41)}
+    \# entries $= 2^{\text{VPN}} = \text{virtual address space} / P$:
+    \tcblower
+    \begin{tabular}{l|l|l}
+        Virt. & $P$ & \# entries \\\hline
+        16-bit & 4k & $2^{16}/2^{12} = 2^4 = \important{16}$ \\
+        16-bit & 8k & $2^{16}/2^{13} = 2^3 = \important{8}$ \\
+        32-bit & 4k & $2^{32}/2^{12} = 2^{20} = \important{1M}$ \\
+        32-bit & 8k & $2^{32}/2^{13} = 2^{19} = \important{512k}$ \\
+    \end{tabular}
+\end{example2}
+
+\begin{example2}{Exercise 2 -- VPN / VPO / PPN / PPO (slide 53)}
+    32-bit virtual, 24-bit physical. VPO = PPO = $\log_2 P$; VPN = $32-$VPO;
+    PPN = $24-$PPO:
+    \tcblower
+    \begin{tabular}{l|c|c|c|c}
+        $P$ & VPN & VPO & PPN & PPO \\\hline
+        1 kB & 22 & 10 & 14 & 10 \\
+        2 kB & 21 & 11 & 13 & 11 \\
+        4 kB & 20 & 12 & 12 & 12 \\
+        8 kB & 19 & 13 & 11 & 13 \\
+    \end{tabular}
+\end{example2}
+
+\begin{example2}{Exam Exercise -- 1 kByte Pages (slide 54 / 2021 A8)}
+    MMU with \important{1 kByte} pages; page table entries are \important{22 bits}
+    (no management bits). Virtual address space = \important{22-bit} (from the diagram).
+    \tcblower
+    \begin{itemize}
+        \item \important{a)} VPO = PPO = $\log_2(1\text{k}) = \important{10}$ bit
+              (VPO and PPO are always equal)
+        \item \important{b)} entry = PPN = 22 bit, so physical addr = PPN + PPO =
+              $22+10 = \important{32}$ bit $\to 2^{32} = $ \important{4 GByte}
+        \item \important{c)} VPN $= 22-10 = 12 \to 2^{12} = \important{4096 entries}$
+        \item \important{d)} TLB bit width = page-table entry width = \important{22 bit}
+    \end{itemize}
+\end{example2}
+
+\subsection{User-Space Access: mmap}
+
+%% >>> IMAGE (slide 43): /dev/mem + mmap maps page-aligned GPIO_BASE_ADDR to virtual_gpio_base; access via virtual_gpio_base + gpio_register_offset <<<
+
+\begin{KR}{Memory-Mapped GPIO via mmap}
+    \texttt{/dev/mem} exposes physical memory; \texttt{mmap()} returns a
+    \important{page-aligned} (4096) virtual pointer to the GPIO base.
+\begin{lstlisting}[language=C, style=basesmol, aboveskip=2pt, belowskip=2pt]
+void *virtual_gpio_base;                 // global pointer
+int mmap_virtual_base() {
+int m_mfd;
+if ((m_mfd = open("/dev/mem", O_RDWR)) < 0) return m_mfd;
+virtual_gpio_base = mmap(NULL, sysconf(_SC_PAGE_SIZE),
+PROT_READ|PROT_WRITE, MAP_SHARED, m_mfd, GPIO_BASE_ADDR);
+close(m_mfd);
+if (virtual_gpio_base == MAP_FAILED) return errno;
+return 0;
+}
+// access:  *(virtual_gpio_base + gpio_register_offset)
+\end{lstlisting}
+    \texttt{GPIO\_BASE\_ADDR} (page-aligned) comes from the \important{device tree}.
+\end{KR}
+
+\subsection{Performance: Cache \& TLB}
+
+\begin{concept}{MMU is Slow}
+    The page table lives in main memory, so each CPU access needs \important{two
+    memory accesses}: (1) read the page table, (2) read the physical memory.
+\end{concept}
+
+\mult{2}
+
+\begin{definition}{Virtual vs. Physical Cache}
+    \begin{itemize}
+        \item \important{Virtual cache} (before MMU): fewer MMU accesses $\to$
+              \important{faster}; must cover the (larger) logical space; must be
+              \important{invalidated on task switch}
+        \item \important{Physical cache} (after MMU): \emph{all} accesses slowed by
+              the MMU
+    \end{itemize}
+\end{definition}
+
+\begin{definition}{TLB}
+    \important{Translation Lookaside Buffer} = a \important{cache of the page table}.
+    \begin{itemize}
+        \item \important{TLB hit} $\to$ instant physical address
+        \item \important{TLB miss} $\to$ walk the page table
+        \item entry invalid $\to$ \important{page fault} (load from disk)
+    \end{itemize}
+\end{definition}
+
+\multend
+
+\begin{corollary}{Finding the Page Table: PTBR / TTBR}
+    How does the CPU find the page table (which is \emph{in} memory) without a lookup?
+    A register holds its \important{physical} base address, set by the OS on each
+    context switch:
+    \begin{itemize}
+        \item \important{PTBR} (x86: \texttt{CR3})
+        \item ARM Cortex: \important{\texttt{TTBR0}} (user) / \important{\texttt{TTBR1}} (kernel)
+    \end{itemize}
+    Caches also store the MMU's \important{access rights} (R/W, privilege) alongside
+    the data, checked on every access (and for inter-process isolation).
+\end{corollary}
+
+\mult{2}
+
+\begin{definition}{Segmentation vs. Paging}
+    \begin{itemize}
+        \item \important{Paging} +: no adder, equal size $\to$ easy swapping,
+              transparent. $-$: longer lookups, page-table memory, internal fragmentation
+        \item \important{Segmentation} +: smaller table, flexible size saves memory.
+              $-$: unequal size hurts swapping, needs programmer effort, adder/comparator
+    \end{itemize}
+\end{definition}
+
+\begin{remark2}{Summary}
+    \important{Advantages}: contiguous appearance despite fragmentation; process
+    \important{isolation}; shared maps for multi-threading; \important{fault
+    isolation}; security. \important{Disadvantages}: slower (translation) + extra
+    page-table memory. Access cost factors: \important{page fault}, \important{TLB
+    miss}, \important{cache miss}.
+\end{remark2}
+
+\multend
+
+\raggedcolumns
